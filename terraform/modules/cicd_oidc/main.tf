@@ -1,14 +1,11 @@
-# Identidad federada para GitHub Actions. Elimina las claves de larga duracion
-# que la consigna 2.4 prohibe explicitamente.
+# OIDC para GitHub Actions; apagado porque la SCP de la cuenta lo bloquea.
 resource "aws_iam_openid_connect_provider" "github" {
   count = var.enable_oidc ? 1 : 0
 
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
 
-  # thumbprint_list se omite a proposito. Desde 2023 IAM valida los proveedores
-  # OIDC conocidos contra su propio almacen de confianza, asi que fijar una
-  # huella a mano solo agrega algo que caduca y rompe el apply mas adelante.
+  # Sin thumbprint_list: IAM valida solo los proveedores OIDC conocidos.
 }
 
 data "aws_iam_policy_document" "confianza" {
@@ -30,8 +27,7 @@ data "aws_iam_policy_document" "confianza" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # Solo este repositorio. Sin esta condicion, cualquier repo de GitHub
-    # podria asumir el rol.
+    # Solo este repositorio puede asumir el rol.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
@@ -49,9 +45,7 @@ resource "aws_iam_role" "github" {
   max_session_duration = 3600
 }
 
-# El pipeline administra toda la infraestructura del proyecto, asi que necesita
-# permisos amplios sobre los servicios involucrados. Se acota por servicio y no
-# se usa AdministratorAccess.
+# Permisos por servicio para administrar el proyecto, sin AdministratorAccess.
 resource "aws_iam_role_policy_attachment" "github" {
   for_each = var.enable_oidc ? toset([
     "arn:aws:iam::aws:policy/AmazonS3FullAccess",
@@ -67,8 +61,7 @@ resource "aws_iam_role_policy_attachment" "github" {
   policy_arn = each.value
 }
 
-# No existe politica gestionada que permita administrar presupuestos: las de
-# Budgets cubren las acciones automaticas, no la creacion. Va en linea.
+# Ninguna politica gestionada permite crear presupuestos: va en linea.
 data "aws_iam_policy_document" "presupuestos" {
   count = var.enable_oidc ? 1 : 0
 

@@ -1,7 +1,6 @@
 name: ci
 
-# En cada Pull Request: formato, validacion, lint, escaneo de seguridad y el
-# plan publicado como comentario. Exigido por la consigna 2.4.
+# En cada PR: fmt, validate, tflint, Checkov y el plan como comentario (consigna 2.4).
 on:
   pull_request:
     branches: [main]
@@ -36,11 +35,7 @@ jobs:
       - name: Formato
         run: terraform -chdir=terraform fmt -check -recursive
 
-      # La organizacion que administra la cuenta bloquea los proveedores OIDC.
-      # Por eso el pipeline recibe credenciales TEMPORALES (hasta 12 h) del rol
-      # pixelpaws-ci, generadas con scripts/credenciales-ci.sh. Caducan solas:
-      # no son claves de larga duracion. Si algun dia OIDC se habilita, alcanza
-      # con cargar AWS_ROLE_ARN y borrar los tres secrets de credenciales.
+      # OIDC esta bloqueado por la SCP: credenciales temporales (12 h) del rol pixelpaws-ci.
       - name: Credenciales AWS
         uses: aws-actions/configure-aws-credentials@v5
         with:

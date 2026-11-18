@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Crea el bucket del estado remoto. Se corre UNA sola vez, a mano, desde
-# CloudShell. El estado tiene que existir antes de que el codigo corra: es el
-# problema de bootstrap.
+# Crea, una sola vez, el bucket del estado y el rol del pipeline (bootstrap).
 set -euo pipefail
 
 REGION="${REGION:-us-east-2}"

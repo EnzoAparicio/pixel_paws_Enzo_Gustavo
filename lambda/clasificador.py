@@ -1,13 +1,4 @@
-"""
-PixelPaws Pets - funcion clasificadora.
-
-Disparada por un evento ObjectCreated del bucket, bajo el prefijo uploads/.
-Clasifica la imagen con Amazon Rekognition DetectLabels y guarda
-{archivo, etiqueta, confianza, fecha} en DynamoDB.
-
-Invocacion asincronica: los fallos van a la DLQ configurada en el
-aws_lambda_function_event_invoke_config, no en el trigger.
-"""
+"""PixelPaws Pets: clasifica la foto subida a uploads/ con Rekognition y la guarda en DynamoDB."""
 
 import json
 import logging
@@ -48,8 +39,7 @@ def handler(event, context):
             _procesar(bucket, clave)
             procesados += 1
         except Exception:
-            # Se relanza para que Lambda reintente y, al agotar reintentos,
-            # el evento termine en la DLQ. No se silencia nunca.
+            # Se relanza para que Lambda reintente y, si sigue fallando, el evento vaya a la DLQ.
             log.exception("Fallo procesando %s/%s", bucket, clave)
             raise
 
@@ -59,11 +49,7 @@ def handler(event, context):
 
 
 def _ya_clasificado(clave):
-    """Deduplicacion: evita pagar Rekognition dos veces por el mismo archivo.
-
-    Es la medida de ahorro de la nota de FinOps: a escala, el 95% del costo es
-    la API de vision.
-    """
+    """Deduplicacion: no paga Rekognition dos veces por el mismo archivo."""
     try:
         respuesta = tabla.get_item(Key={"archivo": clave}, ProjectionExpression="archivo")
         return "Item" in respuesta
@@ -99,14 +85,7 @@ def _procesar(bucket, clave):
 
 
 def _principal(etiquetas):
-    """Devuelve (nombre, confianza) de la etiqueta que se guarda como principal.
-
-    Rekognition suele dar la misma confianza a Animal, Mammal, Canine y Dog, y
-    un max() simple se queda con la primera del empate: todas las fotos dirian
-    "Animal". Por eso, si alguna etiqueta (o uno de sus alias) es Dog o Cat,
-    gana esa. Si hay perro y gato en la misma foto, gana el de mayor confianza.
-    Si no hay especie, la de mayor confianza.
-    """
+    """Etiqueta principal: Dog o Cat si aparecen (Rekognition empata con Animal); si no, la de mayor confianza."""
     con_especie = [(_nombre_especie(e), e["Confidence"]) for e in etiquetas]
     con_especie = [(n, c) for n, c in con_especie if n]
     if con_especie:

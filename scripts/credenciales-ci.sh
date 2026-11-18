@@ -1,14 +1,5 @@
 #!/usr/bin/env bash
-# Genera credenciales TEMPORALES para el pipeline asumiendo el rol pixelpaws-ci.
-#
-# Por que existe: la organizacion que administra la cuenta bloquea los
-# proveedores OIDC, asi que GitHub Actions no puede usar identidad federada.
-# En su lugar recibe credenciales que caducan solas, nunca claves permanentes.
-#
-# Duracion: desde un usuario IAM, hasta 12 h. Desde un rol asumido (la sesion
-# federada de la consola), AWS limita el encadenamiento de roles a 1 h.
-#
-# Uso: bash scripts/credenciales-ci.sh [horas]
+# Genera credenciales temporales del rol pixelpaws-ci para GitHub (12 h desde un usuario IAM).
 set -euo pipefail
 
 HORAS="${1:-12}"

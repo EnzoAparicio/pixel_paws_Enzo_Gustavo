@@ -21,8 +21,7 @@ Thumbs.db
 __pycache__/
 *.pyc
 
-# OneDrive: copias de conflicto ("archivo-NOMBREPC.ext") y metadatos de Windows.
-# Una copia de conflicto de un .tf duplicaria recursos y romperia el plan.
+# Copias de conflicto de OneDrive: un .tf duplicado romperia el plan.
 *-Enzo.*
 *-ENZO.*
 desktop.ini

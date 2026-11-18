@@ -1,8 +1,7 @@
 resource "aws_s3_bucket" "fotos" {
   bucket = "${var.nombre}-fotos-${var.sufijo}"
 
-  # Permite que destroy borre el bucket con fotos dentro: la consigna evalua
-  # "destroy limpio".
+  # Permite destruir el bucket aunque tenga fotos (destroy limpio).
   force_destroy = true
 }
 
@@ -27,8 +26,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "fotos" {
 
   rule {
     apply_server_side_encryption_by_default {
-      # SSE-S3 y no KMS: una clave propia cuesta USD 1 al mes con un
-      # presupuesto de USD 10.
+      # SSE-S3 y no KMS: una clave propia cuesta USD 1 al mes.
       sse_algorithm = "AES256"
     }
     bucket_key_enabled = true

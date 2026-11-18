@@ -10,8 +10,7 @@ resource "aws_sns_topic_subscription" "emails" {
   endpoint  = each.value
 }
 
-# Alarma sobre la DLQ, la que pide la consigna: hay eventos que fallaron
-# tres veces y quedaron guardados para reprocesar.
+# Alarma sobre la DLQ (pide la consigna): eventos que fallaron tres veces.
 resource "aws_cloudwatch_metric_alarm" "dlq_con_mensajes" {
   alarm_name          = "${var.nombre}-dlq-con-mensajes"
   alarm_description   = "Hay eventos en la cola de errores: alguna foto no se pudo clasificar."

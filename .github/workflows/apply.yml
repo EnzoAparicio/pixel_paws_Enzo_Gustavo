@@ -1,7 +1,6 @@
 name: apply
 
-# En merge a main: apply con aprobacion manual mediante environment, y despues
-# la prueba de humo de punta a punta.
+# En merge a main: apply con aprobacion manual del environment production.
 on:
   push:
     branches: [main]
@@ -24,8 +23,7 @@ env:
 jobs:
   apply:
     runs-on: ubuntu-latest
-    # Configurar el environment "production" con revisores obligatorios en
-    # Settings -> Environments. Eso es el "apply controlado" de la rubrica.
+    # production exige un revisor distinto de quien disparo el deploy (apply controlado).
     environment: production
 
     steps:
@@ -36,11 +34,7 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
-      # La organizacion que administra la cuenta bloquea los proveedores OIDC.
-      # Por eso el pipeline recibe credenciales TEMPORALES (hasta 12 h) del rol
-      # pixelpaws-ci, generadas con scripts/credenciales-ci.sh. Caducan solas:
-      # no son claves de larga duracion. Si algun dia OIDC se habilita, alcanza
-      # con cargar AWS_ROLE_ARN y borrar los tres secrets de credenciales.
+      # OIDC esta bloqueado por la SCP: credenciales temporales (12 h) del rol pixelpaws-ci.
       - name: Credenciales AWS
         uses: aws-actions/configure-aws-credentials@v5
         with:

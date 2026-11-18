@@ -1,12 +1,10 @@
 resource "aws_dynamodb_table" "clasificaciones" {
   name = "${var.nombre}-clasificaciones"
 
-  # On-demand y no provisioned: el trafico es por lotes y esporadico, y
-  # provisioned cobra por capacidad reservada aunque no se use.
+  # On-demand: cobra por escritura, no por capacidad reservada.
   billing_mode = "PAY_PER_REQUEST"
 
-  # Clave primaria: el nombre del archivo. Da idempotencia natural, un archivo
-  # reprocesado sobreescribe su propio item en vez de duplicarlo.
+  # La clave es el nombre del archivo: reprocesar una foto no la duplica.
   hash_key = "archivo"
 
   attribute {
@@ -14,8 +12,7 @@ resource "aws_dynamodb_table" "clasificaciones" {
     type = "S"
   }
 
-  # Point in time recovery apagado a proposito: duplica el costo de
-  # almacenamiento y los datos del proyecto son regenerables reprocesando el lote.
+  # PITR apagado: duplica el costo y los datos se regeneran reprocesando las fotos.
   point_in_time_recovery {
     enabled = false
   }
