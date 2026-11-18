@@ -1,7 +1,6 @@
 name: destroy
 
-# Manual. La consigna exige evidencia de destroy inmediatamente despues de la
-# demo, y el anexo de costos lo pone como checklist.
+# Manual: destruye todo y deja evidencia de que la cuenta quedo limpia.
 on:
   workflow_dispatch:
     inputs:
@@ -44,11 +43,7 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
-      # La organizacion que administra la cuenta bloquea los proveedores OIDC.
-      # Por eso el pipeline recibe credenciales TEMPORALES (hasta 12 h) del rol
-      # pixelpaws-ci, generadas con scripts/credenciales-ci.sh. Caducan solas:
-      # no son claves de larga duracion. Si algun dia OIDC se habilita, alcanza
-      # con cargar AWS_ROLE_ARN y borrar los tres secrets de credenciales.
+      # OIDC esta bloqueado por la SCP: credenciales temporales (12 h) del rol pixelpaws-ci.
       - name: Credenciales AWS
         uses: aws-actions/configure-aws-credentials@v5
         with:

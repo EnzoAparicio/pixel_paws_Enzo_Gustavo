@@ -7,16 +7,13 @@ locals {
 
 data "aws_caller_identity" "actual" {}
 
-# ------------------------------------------------------------------- DLQ
-# S3 invoca a Lambda de forma ASINCRONICA, por eso la DLQ se declara en el
-# event_invoke_config y no en el trigger.
+# S3 invoca de forma asincronica: la DLQ va en event_invoke_config, no en el trigger.
 resource "aws_sqs_queue" "dlq" {
   name                      = "${var.nombre}-dlq"
   message_retention_seconds = 345600 # 4 dias
   sqs_managed_sse_enabled   = true
 }
 
-# ------------------------------------------------------------------- IAM
 data "aws_iam_policy_document" "asumir" {
   statement {
     effect  = "Allow"
@@ -34,8 +31,7 @@ resource "aws_iam_role" "clasificador" {
   assume_role_policy = data.aws_iam_policy_document.asumir.json
 }
 
-# Menor privilegio: cada permiso acotado al recurso minimo. Es la matriz IAM
-# de la consigna expresada como codigo.
+# Menor privilegio: cada permiso acotado al recurso minimo (la matriz IAM en codigo).
 data "aws_iam_policy_document" "permisos" {
   statement {
     sid       = "LeerFotosSubidas"
@@ -47,8 +43,7 @@ data "aws_iam_policy_document" "permisos" {
   statement {
     sid    = "ClasificarImagen"
     effect = "Allow"
-    # DetectLabels no admite permisos a nivel de recurso: Rekognition no
-    # expone ARNs para esta operacion.
+    # DetectLabels no tiene ARN de recurso: no se puede acotar.
     actions   = ["rekognition:DetectLabels"]
     resources = ["*"]
   }
@@ -81,9 +76,7 @@ resource "aws_iam_role_policy" "clasificador" {
   policy = data.aws_iam_policy_document.permisos.json
 }
 
-# El rol y su politica antes tenian count (respaldo para Learner Lab). Estos
-# bloques le dicen a Terraform que son los mismos recursos: sin ellos los
-# borraria y los volveria a crear.
+# moved: el rol y su politica perdieron el count; son los mismos recursos, no se recrean.
 moved {
   from = aws_iam_role.clasificador[0]
   to   = aws_iam_role.clasificador
@@ -94,9 +87,7 @@ moved {
   to   = aws_iam_role_policy.clasificador
 }
 
-# ------------------------------------------------------------------- funcion
-# El log group se declara para que Terraform controle la retencion de 7 dias
-# que exige la consigna. Si lo crea Lambda, queda sin vencimiento.
+# Log group propio para fijar la retencion de 7 dias que pide la consigna.
 resource "aws_cloudwatch_log_group" "clasificador" {
   name              = local.log_group
   retention_in_days = 7
@@ -143,7 +134,6 @@ resource "aws_lambda_function_event_invoke_config" "clasificador" {
   }
 }
 
-# ------------------------------------------------------------------- trigger
 resource "aws_lambda_permission" "desde_s3" {
   statement_id   = "PermitirInvocacionDesdeS3"
   action         = "lambda:InvokeFunction"
@@ -162,7 +152,6 @@ resource "aws_s3_bucket_notification" "fotos" {
     filter_prefix       = local.prefijo_entrada
   }
 
-  # Sin este depends_on, S3 valida el destino antes de que exista el permiso y
-  # el apply falla.
+  # Sin este depends_on, S3 valida el destino antes de que exista el permiso y falla.
   depends_on = [aws_lambda_permission.desde_s3]
 }

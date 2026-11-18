@@ -1,6 +1,5 @@
 terraform {
-  # Versiones ancladas, exigido por la consigna 2.3.
-  # 1.10 es el minimo para use_lockfile (bloqueo nativo del backend S3).
+  # Versiones ancladas (consigna 2.3); 1.10 es el minimo para use_lockfile.
   required_version = "~> 1.17"
 
   required_providers {
@@ -18,16 +17,14 @@ terraform {
     }
   }
 
-  # Configuracion parcial: el resto vive en backend.hcl, que no se versiona
-  # con valores reales porque el nombre del bucket es unico por equipo.
+  # Backend parcial: el bucket y la clave estan en backend.hcl.
   backend "s3" {}
 }
 
 provider "aws" {
   region = var.region
 
-  # Etiquetas obligatorias de la consigna 2.3, aplicadas a todo recurso que
-  # las soporte. Asi no hay que repetirlas modulo por modulo.
+  # Etiquetas obligatorias (consigna 2.3) en todo recurso, sin repetirlas por modulo.
   default_tags {
     tags = {
       project = var.proyecto

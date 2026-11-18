@@ -6,8 +6,7 @@ resource "aws_budgets_budget" "proyecto" {
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
-  # Filtra por la etiqueta obligatoria project, asi el presupuesto mide este
-  # proyecto y no toda la cuenta.
+  # Filtra por la etiqueta project: mide solo este proyecto.
   cost_filter {
     name   = "TagKeyValue"
     values = ["user:project$${var.proyecto}"]
