@@ -1,0 +1,74 @@
+name: destroy
+
+# Manual. La consigna exige evidencia de destroy inmediatamente despues de la
+# demo, y el anexo de costos lo pone como checklist.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmacion:
+        description: 'Escribir DESTRUIR para confirmar'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: pixelpaws-estado
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: "1.17.2"
+  AWS_REGION: us-east-2
+  # Los mails no estan en el repo (es publico): vienen de un secret.
+  TF_VAR_emails_alerta: ${{ secrets.EMAILS_ALERTA }}
+  TF_VAR_repositorio_github: ${{ github.repository }}
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Verificar confirmacion
+        if: inputs.confirmacion != 'DESTRUIR'
+        run: |
+          echo "Hay que escribir DESTRUIR para confirmar." >&2
+          exit 1
+
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      # La organizacion que administra la cuenta bloquea los proveedores OIDC.
+      # Por eso el pipeline recibe credenciales TEMPORALES (hasta 12 h) del rol
+      # pixelpaws-ci, generadas con scripts/credenciales-ci.sh. Caducan solas:
+      # no son claves de larga duracion. Si algun dia OIDC se habilita, alcanza
+      # con cargar AWS_ROLE_ARN y borrar los tres secrets de credenciales.
+      - name: Credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Destroy
+        run: ./scripts/tf.sh destroy
+
+      - name: Evidencia de cuenta limpia
+        run: |
+          {
+            echo "### Recursos restantes"
+            echo ""
+            echo '```'
+            echo "Lambdas:"; aws lambda list-functions --query "Functions[?starts_with(FunctionName,'pixelpaws')].FunctionName" --output text
+            echo "Tablas:";  aws dynamodb list-tables --query "TableNames[?starts_with(@,'pixelpaws')]" --output text
+            echo "Buckets:"; aws s3 ls | grep pixelpaws || echo "ninguno"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

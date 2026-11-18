@@ -1,0 +1,75 @@
+name: apply
+
+# En merge a main: apply con aprobacion manual mediante environment, y despues
+# la prueba de humo de punta a punta.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: pixelpaws-estado # nunca dos apply sobre el mismo state
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: "1.17.2"
+  AWS_REGION: us-east-2
+  # Los mails no estan en el repo (es publico): vienen de un secret.
+  TF_VAR_emails_alerta: ${{ secrets.EMAILS_ALERTA }}
+  TF_VAR_repositorio_github: ${{ github.repository }}
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    # Configurar el environment "production" con revisores obligatorios en
+    # Settings -> Environments. Eso es el "apply controlado" de la rubrica.
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      # La organizacion que administra la cuenta bloquea los proveedores OIDC.
+      # Por eso el pipeline recibe credenciales TEMPORALES (hasta 12 h) del rol
+      # pixelpaws-ci, generadas con scripts/credenciales-ci.sh. Caducan solas:
+      # no son claves de larga duracion. Si algun dia OIDC se habilita, alcanza
+      # con cargar AWS_ROLE_ARN y borrar los tres secrets de credenciales.
+      - name: Credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Apply
+        run: ./scripts/tf.sh apply
+
+      # Un aviso de bucket recien creado tarda entre 3 y 6 minutos en empezar a
+      # entregar eventos (medido el 18/11 en esta cuenta). En un despliegue desde
+      # cero la primera foto se pierde, asi que se reintenta con una foto nueva.
+      - name: Prueba de humo
+        run: |
+          for intento in 1 2 3 4 5 6 7 8; do
+            ./scripts/smoke-test.sh pruebas/fixtures/perro.jpg && exit 0
+            echo "Intento ${intento} sin clasificar: el aviso del bucket puede estar propagandose"
+          done
+          exit 1
+
+      - name: Resumen
+        run: |
+          {
+            echo "### Despliegue correcto"
+            echo ""
+            echo '```'
+            terraform -chdir=terraform output
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

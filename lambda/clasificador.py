@@ -91,14 +91,14 @@ def _procesar(bucket, clave):
     if not etiquetas:
         raise ValueError("Rekognition no devolvio etiquetas sobre el umbral de confianza")
 
-    principal = max(etiquetas, key=lambda e: e["Confidence"])
-    especie = _especie(etiquetas)
+    nombre, confianza = _principal(etiquetas)
+    especie = ESPECIES.get(nombre)
 
     item = {
         "archivo": clave,
-        "etiqueta": principal["Name"],
+        "etiqueta": nombre,
         # DynamoDB no acepta float: hay que usar Decimal sobre el str.
-        "confianza": Decimal(str(round(principal["Confidence"], 2))),
+        "confianza": Decimal(str(round(confianza, 2))),
         "fecha": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "etiquetas": [
             {"nombre": e["Name"], "confianza": Decimal(str(round(e["Confidence"], 2)))}
@@ -108,19 +108,36 @@ def _procesar(bucket, clave):
         "bucket": bucket,
     }
     tabla.put_item(Item=item)
-    log.info("Guardado %s -> %s (%.2f%%)", clave, principal["Name"], principal["Confidence"])
+    log.info("Guardado %s -> %s (%.2f%%)", clave, nombre, confianza)
 
     if MOVER and especie:
         _copiar(bucket, clave, especie)
 
 
-def _especie(etiquetas):
-    """Devuelve 'perros' o 'gatos' si alguna etiqueta lo identifica."""
-    for etiqueta in etiquetas:
-        nombres = [etiqueta["Name"]] + [a["Name"] for a in etiqueta.get("Aliases", [])]
-        for nombre in nombres:
-            if nombre in ESPECIES:
-                return ESPECIES[nombre]
+def _principal(etiquetas):
+    """Devuelve (nombre, confianza) de la etiqueta que se guarda como principal.
+
+    Rekognition suele dar la misma confianza a Animal, Mammal, Canine y Dog, y
+    un max() simple se queda con la primera del empate: todas las fotos dirian
+    "Animal". Por eso, si alguna etiqueta (o uno de sus alias) es una especie
+    de ESPECIES, gana esa, con su nombre de especie. Si hay perro y gato en la
+    misma foto, gana el de mayor confianza. Si no hay especie, la de mayor
+    confianza, como antes.
+    """
+    con_especie = [(_nombre_especie(e), e["Confidence"]) for e in etiquetas]
+    con_especie = [(n, c) for n, c in con_especie if n]
+    if con_especie:
+        return max(con_especie, key=lambda par: par[1])
+    mayor = max(etiquetas, key=lambda e: e["Confidence"])
+    return mayor["Name"], mayor["Confidence"]
+
+
+def _nombre_especie(etiqueta):
+    """'Dog' o 'Cat' si la etiqueta o alguno de sus alias es una especie, si no None."""
+    nombres = [etiqueta["Name"]] + [a["Name"] for a in etiqueta.get("Aliases", [])]
+    for nombre in nombres:
+        if nombre in ESPECIES:
+            return nombre
     return None
 
 
