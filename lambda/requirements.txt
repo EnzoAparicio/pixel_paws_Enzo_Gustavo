@@ -1,3 +1,0 @@
-# Vacio a proposito.
-# boto3 y botocore ya vienen en el runtime de Lambda para Python 3.12, asi que
-# el paquete de despliegue es un unico .py y no hace falta capa ni vendoring.

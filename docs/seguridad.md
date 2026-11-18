@@ -44,6 +44,12 @@ Se suprimen con justificación escrita, no por comodidad.
 |---|---|---|
 | `CKV_AWS_18` | Access logging en el bucket | Un segundo bucket de logs duplica el almacenamiento con un presupuesto de USD 10. La auditoría la cubre CloudTrail a nivel de cuenta |
 | `CKV_AWS_144` | Replicación entre regiones | Costo de transferencia, y la consigna pide una sola región |
-| `CKV_AWS_28`, `CKV2_AWS_62` | Point in time recovery y notificaciones en DynamoDB | PITR duplica el costo de almacenamiento y los datos se regeneran reprocesando las fotos |
-| `CKV_AWS_119` | DynamoDB cifrado con clave propia | Una clave KMS propia cuesta USD 1 por mes, el 10% del presupuesto. Se usa la clave de AWS |
-| `CKV_AWS_158` | Log groups cifrados con KMS | Mismo motivo |
+| `CKV_AWS_28` | Point in time recovery en DynamoDB | Duplica el costo de almacenamiento y los datos se regeneran reprocesando las fotos |
+| `CKV2_AWS_62` | Notificaciones de eventos en el bucket | Falso positivo: la notificación existe, en `aws_s3_bucket_notification` del módulo `clasificador`. Checkov no la relaciona con el bucket porque está en otro módulo |
+| `CKV_AWS_116` | DLQ en la función | Falso positivo: la DLQ está en la configuración de invocación asincrónica (`aws_lambda_function_event_invoke_config`, `on_failure`), que es lo correcto para eventos de S3. Checkov solo revisa `dead_letter_config` |
+| `CKV_AWS_338` | Logs retenidos al menos un año | La consigna exige 7 días |
+| `CKV_AWS_117` | Lambda dentro de una VPC | La función solo usa servicios gestionados. En una VPC necesitaría un NAT Gateway, unos USD 32 por mes: el costo fijo que la consigna pide evitar |
+| `CKV_AWS_50` | Trazas de X-Ray | Con un solo salto no aportan. El dashboard y los logs cubren la observabilidad que pide la consigna |
+| `CKV_AWS_272` | Firma de código | Requiere AWS Signer. El paquete lo construye y despliega solo el pipeline de este repositorio |
+| `CKV2_AWS_61` | Regla de vencimiento en el bucket | Borraría las fotos del lote antes de la defensa. El bucket se destruye al cerrar el proyecto |
+| `CKV_AWS_119`, `CKV_AWS_158`, `CKV_AWS_173`, `CKV_AWS_26`, `CKV_AWS_145` | Clave KMS propia en DynamoDB, logs, variables de la Lambda, SNS y S3 | Cada clave cuesta USD 1 por mes, el 10% del presupuesto. Todo se cifra igual con claves de AWS. La única variable de entorno es el nombre de la tabla, y SNS solo transporta el texto de la alarma |
