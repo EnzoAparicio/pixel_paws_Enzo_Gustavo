@@ -13,7 +13,7 @@ cd "${ROOT}/terraform"
 
 BUCKET="$(terraform output -raw bucket)"
 TABLA="$(terraform output -raw tabla)"
-PREFIJO="$(terraform output -raw prefijo_entrada)"
+PREFIJO="uploads/" # el prefijo que dispara la funcion
 CLAVE="${PREFIJO}smoke-$(date +%s).jpg"
 
 echo ">> Subiendo ${CLAVE} a ${BUCKET}"

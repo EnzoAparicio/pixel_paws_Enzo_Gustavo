@@ -1,11 +1,6 @@
 output "bucket" {
-  description = "Bucket de fotos. Subir a este prefijo para disparar la clasificacion."
+  description = "Bucket de fotos. Subirlas a uploads/ dispara la clasificacion."
   value       = module.almacenamiento.bucket_id
-}
-
-output "prefijo_entrada" {
-  description = "Prefijo donde hay que subir las fotos."
-  value       = var.prefijo_entrada
 }
 
 output "tabla" {
@@ -29,11 +24,11 @@ output "dashboard_url" {
 }
 
 output "rol_github_arn" {
-  description = "ARN del rol que asume GitHub Actions via OIDC. Va en el secret AWS_ROLE_ARN."
+  description = "ARN del rol que asumiria GitHub Actions via OIDC (null si enable_oidc es false)."
   value       = module.cicd_oidc.rol_arn
 }
 
 output "comando_consulta" {
-  description = "Consulta de resultados del lote, entregable especifico de PixelPaws."
+  description = "Consulta de resultados del lote."
   value       = "aws dynamodb scan --table-name ${module.catalogo.tabla_name} --projection-expression 'archivo,etiqueta,confianza,fecha' --region ${var.region}"
 }

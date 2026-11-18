@@ -355,13 +355,6 @@
             <text class="s dim" x="890" y="226" text-anchor="middle" fill="currentColor">etiqueta, confianza, fecha</text>
           </g>
 
-          <!-- extra opcional -->
-          <g>
-            <rect x="812" y="296" width="156" height="72" rx="6" fill="none" stroke="var(--muted)" stroke-opacity=".7" stroke-dasharray="5 4"></rect>
-            <text class="b" x="890" y="321" text-anchor="middle" fill="var(--muted)">Copia opcional</text>
-            <text class="m" x="890" y="340" text-anchor="middle" fill="var(--muted)">clasificadas/perros/</text>
-            <text class="m" x="890" y="356" text-anchor="middle" fill="var(--muted)">clasificadas/gatos/</text>
-          </g>
 
           <!-- camino de error -->
           <g>
@@ -400,10 +393,6 @@
           <text class="a" x="748" y="166" text-anchor="middle" fill="currentColor">GetItem (dedup)</text>
           <text class="a" x="748" y="179" text-anchor="middle" fill="currentColor">PutItem</text>
 
-          <path d="M 692 222 L 760 222 L 760 332" fill="none" stroke="var(--muted)" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#f1x)"></path>
-          <path d="M 760 332 L 804 332" fill="none" stroke="var(--muted)" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#f1x)"></path>
-          <text class="a" x="770" y="258" text-anchor="start" fill="var(--muted)">extra, apagado</text>
-          <text class="a" x="770" y="271" text-anchor="start" fill="var(--muted)">por defecto</text>
 
           <line x1="608" y1="236" x2="608" y2="300" stroke="var(--signal)" stroke-width="1.4" marker-end="url(#f1d)"></line>
           <text class="a" x="618" y="262" text-anchor="start" fill="var(--signal)">falla tras</text>
@@ -416,11 +405,11 @@
           <text class="a" x="748" y="428" text-anchor="middle" fill="currentColor">notifica</text>
         </svg>
       </div>
-      <figcaption>El filtro <code>uploads/</code> sobre el evento no es cosmético: es lo único
-        que impide que la copia opcional a <code>clasificadas/</code> vuelva a disparar la
-        función y la deje invocándose a sí misma, pagando una llamada a Rekognition por vuelta.
-        La consulta <code>GetItem</code> antes de clasificar evita pagar dos veces por el mismo
-        archivo, que a escala es la única medida de ahorro que mueve la aguja.</figcaption>
+      <figcaption>Solo las fotos subidas a <code>uploads/</code> disparan la función. La consulta
+        <code>GetItem</code> antes de clasificar evita pagar dos veces por el mismo archivo, que a
+        escala es la única medida de ahorro que mueve la aguja: el 95% del costo es Rekognition.
+        La tabla guarda exactamente lo que pide la consigna: archivo, etiqueta, confianza y
+        fecha.</figcaption>
     </figure>
   </section>
 
@@ -430,14 +419,14 @@
   <section class="fig">
     <span class="fignum">Figura 2</span>
     <h2>Un permiso por recurso, y el único que no se pudo acotar</h2>
-    <p class="claim">La función tiene seis permisos. Cinco apuntan a un recurso concreto, uno
-      incluso a un prefijo dentro del bucket. El sexto apunta a todo, y se sabe exactamente
+    <p class="claim">La función tiene cinco permisos. Cuatro apuntan a un recurso concreto, uno
+      incluso a un prefijo dentro del bucket. El quinto apunta a todo, y se sabe exactamente
       por qué.</p>
 
     <figure>
       <div class="scroller">
-        <svg viewBox="0 0 980 540" role="img"
-             aria-label="Permisos del rol de ejecucion de la funcion clasificadora en us-east-2, cada uno acotado a un recurso: s3 GetObject solo sobre el prefijo uploads, s3 PutObject solo sobre clasificadas, dynamodb PutItem y GetItem solo sobre la tabla, sqs SendMessage solo sobre la cola de errores, logs solo sobre el log group de la funcion. El unico permiso sin recurso acotado es rekognition DetectLabels, porque esa operacion no expone identificadores de recurso.">
+        <svg viewBox="0 0 980 468" role="img"
+             aria-label="Permisos del rol de ejecucion de la funcion clasificadora en us-east-2, cada uno acotado a un recurso: s3 GetObject solo sobre el prefijo uploads, dynamodb PutItem y GetItem solo sobre la tabla, sqs SendMessage solo sobre la cola de errores, logs solo sobre el log group de la funcion. El unico permiso sin recurso acotado es rekognition DetectLabels, porque esa operacion no expone identificadores de recurso.">
           <defs>
             <marker id="f2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
@@ -448,20 +437,20 @@
           </defs>
 
           <!-- limite de la cuenta -->
-          <rect x="14" y="44" width="952" height="482" rx="12" fill="none"
+          <rect x="14" y="44" width="952" height="410" rx="12" fill="none"
                 stroke="currentColor" stroke-opacity=".3" stroke-dasharray="7 5"></rect>
           <text class="m" x="26" y="34" fill="currentColor" opacity=".7">Cuenta AWS propia · us-east-2 · nada con acceso público</text>
 
           <!-- rol -->
-          <rect x="38" y="238" width="192" height="94" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-opacity=".55"></rect>
-          <text class="b" x="134" y="266" text-anchor="middle" fill="var(--accent-ink)">Rol de ejecución</text>
-          <text class="s" x="134" y="285" text-anchor="middle" fill="var(--accent-ink)">de la función</text>
-          <text class="m" x="134" y="307" text-anchor="middle" fill="var(--accent-ink)">clasificador-rol</text>
-          <text class="s dim" x="134" y="324" text-anchor="middle" fill="var(--accent-ink)">política en línea</text>
+          <rect x="38" y="201" width="192" height="94" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-opacity=".55"></rect>
+          <text class="b" x="134" y="229" text-anchor="middle" fill="var(--accent-ink)">Rol de ejecución</text>
+          <text class="s" x="134" y="248" text-anchor="middle" fill="var(--accent-ink)">de la función</text>
+          <text class="m" x="134" y="270" text-anchor="middle" fill="var(--accent-ink)">clasificador-rol</text>
+          <text class="s dim" x="134" y="287" text-anchor="middle" fill="var(--accent-ink)">política en línea</text>
 
           <!-- bus -->
-          <line x1="230" y1="285" x2="286" y2="285" stroke="currentColor" stroke-width="1.4"></line>
-          <line x1="286" y1="104" x2="286" y2="466" stroke="currentColor" stroke-width="1.4"></line>
+          <line x1="230" y1="248" x2="286" y2="248" stroke="currentColor" stroke-width="1.4"></line>
+          <line x1="286" y1="104" x2="286" y2="394" stroke="currentColor" stroke-width="1.4"></line>
 
           <!-- fila 1 -->
           <line x1="286" y1="104" x2="568" y2="104" stroke="currentColor" stroke-width="1.3" marker-end="url(#f2a)"></line>
@@ -470,41 +459,34 @@
           <text class="m" x="592" y="100" fill="var(--accent)">bucket/uploads/*</text>
           <text class="s dim" x="592" y="118" fill="currentColor">solo el prefijo de entrada, no el bucket entero</text>
 
-          <!-- fila 2 -->
-          <line x1="286" y1="176" x2="568" y2="176" stroke="currentColor" stroke-width="1.3" marker-end="url(#f2a)"></line>
-          <text class="a" x="294" y="167" fill="currentColor">s3:PutObject</text>
-          <rect x="576" y="152" width="378" height="48" rx="5" fill="var(--surface)" stroke="currentColor" stroke-opacity=".3"></rect>
-          <text class="m" x="592" y="172" fill="var(--accent)">bucket/clasificadas/*</text>
-          <text class="s dim" x="592" y="190" fill="currentColor">no puede escribir donde lee: corta la recursión</text>
-
           <!-- fila 3 destacada -->
-          <line x1="286" y1="248" x2="568" y2="248" stroke="var(--signal)" stroke-width="1.5" marker-end="url(#f2d)"></line>
-          <text class="a" x="294" y="239" fill="var(--signal)">rekognition:DetectLabels</text>
-          <rect x="576" y="224" width="378" height="48" rx="5" fill="var(--signal-soft)" stroke="var(--signal)" stroke-opacity=".5"></rect>
-          <text class="m" x="592" y="244" fill="var(--signal)">*</text>
-          <text class="s" x="608" y="244" fill="var(--signal)">(único sin acotar)</text>
-          <text class="s dim" x="592" y="262" fill="var(--signal)">la operación no expone ARN: no admite restricción</text>
+          <line x1="286" y1="176" x2="568" y2="176" stroke="var(--signal)" stroke-width="1.5" marker-end="url(#f2d)"></line>
+          <text class="a" x="294" y="167" fill="var(--signal)">rekognition:DetectLabels</text>
+          <rect x="576" y="152" width="378" height="48" rx="5" fill="var(--signal-soft)" stroke="var(--signal)" stroke-opacity=".5"></rect>
+          <text class="m" x="592" y="172" fill="var(--signal)">*</text>
+          <text class="s" x="608" y="172" fill="var(--signal)">(único sin acotar)</text>
+          <text class="s dim" x="592" y="190" fill="var(--signal)">la operación no expone ARN: no admite restricción</text>
 
           <!-- fila 4 -->
-          <line x1="286" y1="320" x2="568" y2="320" stroke="currentColor" stroke-width="1.3" marker-end="url(#f2a)"></line>
-          <text class="a" x="294" y="311" fill="currentColor">dynamodb:PutItem · GetItem</text>
-          <rect x="576" y="296" width="378" height="48" rx="5" fill="var(--surface)" stroke="currentColor" stroke-opacity=".3"></rect>
-          <text class="m" x="592" y="316" fill="var(--accent)">tabla clasificaciones</text>
-          <text class="s dim" x="592" y="334" fill="currentColor">sin Scan ni Query: la función no lee listados</text>
+          <line x1="286" y1="248" x2="568" y2="248" stroke="currentColor" stroke-width="1.3" marker-end="url(#f2a)"></line>
+          <text class="a" x="294" y="239" fill="currentColor">dynamodb:PutItem · GetItem</text>
+          <rect x="576" y="224" width="378" height="48" rx="5" fill="var(--surface)" stroke="currentColor" stroke-opacity=".3"></rect>
+          <text class="m" x="592" y="244" fill="var(--accent)">tabla clasificaciones</text>
+          <text class="s dim" x="592" y="262" fill="currentColor">sin Scan ni Query: la función no lee listados</text>
 
           <!-- fila 5 -->
-          <line x1="286" y1="392" x2="568" y2="392" stroke="currentColor" stroke-width="1.3" marker-end="url(#f2a)"></line>
-          <text class="a" x="294" y="383" fill="currentColor">sqs:SendMessage</text>
-          <rect x="576" y="368" width="378" height="48" rx="5" fill="var(--surface)" stroke="currentColor" stroke-opacity=".3"></rect>
-          <text class="m" x="592" y="388" fill="var(--accent)">cola de errores</text>
-          <text class="s dim" x="592" y="406" fill="currentColor">solo enviar: no puede leer ni borrar la cola</text>
+          <line x1="286" y1="320" x2="568" y2="320" stroke="currentColor" stroke-width="1.3" marker-end="url(#f2a)"></line>
+          <text class="a" x="294" y="311" fill="currentColor">sqs:SendMessage</text>
+          <rect x="576" y="296" width="378" height="48" rx="5" fill="var(--surface)" stroke="currentColor" stroke-opacity=".3"></rect>
+          <text class="m" x="592" y="316" fill="var(--accent)">cola de errores</text>
+          <text class="s dim" x="592" y="334" fill="currentColor">solo enviar: no puede leer ni borrar la cola</text>
 
           <!-- fila 6 -->
-          <line x1="286" y1="466" x2="568" y2="466" stroke="currentColor" stroke-width="1.3" marker-end="url(#f2a)"></line>
-          <text class="a" x="294" y="457" fill="currentColor">logs:CreateLogStream · PutLogEvents</text>
-          <rect x="576" y="442" width="378" height="48" rx="5" fill="var(--surface)" stroke="currentColor" stroke-opacity=".3"></rect>
-          <text class="m" x="592" y="462" fill="var(--accent)">log group de la función</text>
-          <text class="s dim" x="592" y="480" fill="currentColor">sin CreateLogGroup: ya existe, con retención de 7 días</text>
+          <line x1="286" y1="394" x2="568" y2="394" stroke="currentColor" stroke-width="1.3" marker-end="url(#f2a)"></line>
+          <text class="a" x="294" y="385" fill="currentColor">logs:CreateLogStream · PutLogEvents</text>
+          <rect x="576" y="370" width="378" height="48" rx="5" fill="var(--surface)" stroke="currentColor" stroke-opacity=".3"></rect>
+          <text class="m" x="592" y="390" fill="var(--accent)">log group de la función</text>
+          <text class="s dim" x="592" y="408" fill="currentColor">sin CreateLogGroup: ya existe, con retención de 7 días</text>
         </svg>
       </div>
       <figcaption>Dos ausencias dicen tanto como los permisos presentes. No está
@@ -635,11 +617,11 @@
           necesita el nombre del bucket. Es una dependencia circular que Terraform no deduce:
           sin declararla a mano, el primer apply falla.</p>
       </div>
-      <div class="note danger">
-        <h3>La recursión es el único riesgo de factura</h3>
-        <p>Ningún recurso de esta arquitectura cobra por hora: sin balanceador, sin NAT, sin base
-          gestionada, sin clúster. La única forma de generar una factura dolorosa es que la
-          función se invoque a sí misma y pague una clasificación por vuelta.</p>
+      <div class="note">
+        <h3>Ningún recurso cobra por hora</h3>
+        <p>Sin balanceador, sin NAT, sin base gestionada, sin clúster. Si nadie sube fotos, el
+          costo es cero. A escala, el 95% del gasto es Rekognition: por eso la función consulta la
+          tabla antes de clasificar.</p>
       </div>
     </div>
 

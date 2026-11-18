@@ -18,7 +18,7 @@ Diagrama de arquitectura: [`docs/arquitectura.html`](docs/arquitectura.html).
 ```
 .
 ├── bootstrap/bootstrap.sh     # crea el bucket del estado y el rol del pipeline, una sola vez
-├── lambda/                    # la función y sus tests
+├── lambda/                    # la función clasificadora
 ├── terraform/                 # raíz + 6 módulos: almacenamiento, catalogo, clasificador,
 │                              # observabilidad, finops, cicd_oidc
 ├── scripts/
@@ -61,7 +61,8 @@ Requiere Terraform 1.17 y el AWS CLI autenticado en la cuenta, región `us-east-
    Confirmar la suscripción en el mail de AWS Notifications, si no las alarmas no llegan.
 
 **Pipeline:** en GitHub, crear el environment `production` con revisores obligatorios, y los
-secrets `EMAILS_ALERTA` y las credenciales que genera `./scripts/credenciales-ci.sh`. Por qué
+secrets `EMAILS_ALERTA` y las credenciales temporales que genera
+`AWS_PROFILE=pixelpaws-emisor ./scripts/credenciales-ci.sh` (duran 12 horas). Por qué
 credenciales temporales y no OIDC: [`docs/seguridad.md`](docs/seguridad.md).
 
 ## Destruir
@@ -77,6 +78,6 @@ El bucket del estado queda: al cerrar el proyecto se borra desde la consola de S
 
 ## Más información
 
-- [`docs/seguridad.md`](docs/seguridad.md): matriz IAM, hallazgos aceptados de Checkov y riesgo de recursión
+- [`docs/seguridad.md`](docs/seguridad.md): matriz IAM, autenticación del pipeline y hallazgos aceptados de Checkov
 - [`docs/FinOps - estimacion y proyeccion PixelPaws.md`](docs/FinOps%20-%20estimacion%20y%20proyeccion%20PixelPaws.md): costo real y proyección
 - [`docs/Decision 01 - cuenta AWS Academy y brechas de la consigna.md`](docs/Decision%2001%20-%20cuenta%20AWS%20Academy%20y%20brechas%20de%20la%20consigna.md): elección de la cuenta

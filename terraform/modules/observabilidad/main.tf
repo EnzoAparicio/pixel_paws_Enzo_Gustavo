@@ -10,29 +10,8 @@ resource "aws_sns_topic_subscription" "emails" {
   endpoint  = each.value
 }
 
-# Alarma 1: la funcion esta fallando.
-resource "aws_cloudwatch_metric_alarm" "errores_funcion" {
-  alarm_name          = "${var.nombre}-errores-funcion"
-  alarm_description   = "La funcion clasificadora devolvio errores en el ultimo minuto."
-  namespace           = "AWS/Lambda"
-  metric_name         = "Errors"
-  statistic           = "Sum"
-  period              = 60
-  evaluation_periods  = 1
-  threshold           = 1
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  treat_missing_data  = "notBreaching"
-
-  dimensions = {
-    FunctionName = var.funcion_name
-  }
-
-  alarm_actions = [aws_sns_topic.alertas.arn]
-  ok_actions    = [aws_sns_topic.alertas.arn]
-}
-
-# Alarma 2: hay mensajes en la DLQ, o sea eventos que se perdieron.
-# Esta es la que conviene disparar en la demo: es la mas visual.
+# Alarma sobre la DLQ, la que pide la consigna: hay eventos que fallaron
+# tres veces y quedaron guardados para reprocesar.
 resource "aws_cloudwatch_metric_alarm" "dlq_con_mensajes" {
   alarm_name          = "${var.nombre}-dlq-con-mensajes"
   alarm_description   = "Hay eventos en la cola de errores: alguna foto no se pudo clasificar."

@@ -1,8 +1,5 @@
-# Presupuesto con los tres avisos que pide la consigna. Detras de bandera
-# porque AWS Academy Learner Lab no da acceso a facturacion.
+# Presupuesto con los tres avisos que pide la consigna.
 resource "aws_budgets_budget" "proyecto" {
-  count = var.enable_budget ? 1 : 0
-
   name         = "${var.nombre}-presupuesto"
   budget_type  = "COST"
   limit_amount = tostring(var.monto_usd)
@@ -42,4 +39,10 @@ resource "aws_budgets_budget" "proyecto" {
     notification_type          = "FORECASTED"
     subscriber_email_addresses = var.emails_alerta
   }
+}
+
+# Antes tenia count (respaldo para Learner Lab): es el mismo recurso.
+moved {
+  from = aws_budgets_budget.proyecto[0]
+  to   = aws_budgets_budget.proyecto
 }

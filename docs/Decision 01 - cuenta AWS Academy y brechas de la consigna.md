@@ -102,65 +102,19 @@ La pregunta de cierre 4 del lab 06 es "¿qué riesgos tienen las claves estátic
 cómo los elimina OIDC?". O sea que el docente sabe que en Academy no se puede y lo trata como
 tema teórico. El costo de esta brecha es parcial, no total.
 
-## Cómo se recuperan los puntos
+## Cómo quedó en el código
 
-El patrón ya está en la consigna: *"recursos costosos detrás de banderas `enable_*` para
-crearlos solo cuando se necesiten"*. Se usa la misma idea para los recursos que el entorno no
-permite. **El código se escribe completo y queda desactivado por bandera.**
+Con la cuenta propia confirmada, el respaldo para Learner Lab dejó de tener sentido y se sacó:
+ya no existen las banderas `crear_iam_propio` ni `enable_budget`. El rol de menor privilegio de
+la función y el presupuesto se crean siempre.
 
-```hcl
-variable "crear_iam_propio" {
-  description = "Crea el rol de ejecución de la Lambda con políticas de menor privilegio. En AWS Academy Learner Lab va en false: IAM no permite crear roles."
-  type        = bool
-  default     = false
-}
-
-variable "lambda_role_arn_externo" {
-  description = "ARN de un rol preexistente, usado cuando crear_iam_propio es false (LabRole en Learner Lab)."
-  type        = string
-  default     = ""
-
-  validation {
-    condition     = var.crear_iam_propio || can(regex("^arn:aws:iam::[0-9]{12}:role/", var.lambda_role_arn_externo))
-    error_message = "Con crear_iam_propio en false hay que pasar el ARN de un rol existente."
-  }
-}
-```
-
-```hcl
-locals {
-  lambda_role_arn = var.crear_iam_propio ? aws_iam_role.clasificador[0].arn : var.lambda_role_arn_externo
-}
-
-resource "aws_iam_role" "clasificador" {
-  count = var.crear_iam_propio ? 1 : 0
-  # política de menor privilegio real: s3:GetObject solo en uploads/*,
-  # rekognition:DetectLabels, dynamodb:PutItem en una tabla, sqs:SendMessage en la DLQ
-}
-```
-
-Tres banderas. En la cuenta propia van en `true` y se aplican de verdad, que es la razón
-principal para elegirla. Si hubiera que caer a Learner Lab van en `false` y el código queda
-igual, como evidencia mostrable con `plan`:
-
-| Bandera | Recurso que gobierna | Brecha que cubre |
-|---|---|---|
-| `crear_iam_propio` | `aws_iam_role` + políticas de menor privilegio | 1 |
-| `enable_oidc` | `aws_iam_openid_connect_provider` + rol con trust policy de GitHub | 2 |
-| `enable_budget` | `aws_budgets_budget` con avisos al 50/80/100% de USD 10 | 3 |
-
-### La jugada clave
-
-`terraform plan` **no necesita permisos de creación**: calcula el diff sin llamar a la API de
-creación. Entonces en la defensa se puede correr:
+Queda una sola bandera, `enable_oidc = false`, porque la organización que administra la cuenta
+del plan Free bloquea los proveedores OIDC (ver `docs/seguridad.md`). El código de OIDC está
+escrito y se puede mostrar sin aplicarlo:
 
 ```
-terraform plan -var crear_iam_propio=true -var enable_oidc=true -var enable_budget=true
+terraform plan -var enable_oidc=true
 ```
-
-y mostrar el plan que crearía el rol de menor privilegio, el proveedor OIDC y el presupuesto.
-Es evidencia ejecutable de que el código está bien, sin necesitar una cuenta que lo aplique.
-Eso recupera la mayor parte de lo que se pierde en CI/CD (10%) y Seguridad e IAM (10%).
 
 ## Impacto estimado en la rúbrica
 

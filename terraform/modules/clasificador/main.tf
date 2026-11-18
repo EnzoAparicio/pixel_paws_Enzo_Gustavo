@@ -1,14 +1,15 @@
 locals {
   funcion_name = "${var.nombre}-clasificador"
   log_group    = "/aws/lambda/${local.funcion_name}"
-  rol_arn      = var.crear_iam_propio ? aws_iam_role.clasificador[0].arn : var.rol_ejecucion_externo
+  # Solo las fotos subidas a este prefijo disparan la funcion.
+  prefijo_entrada = "uploads/"
 }
 
 data "aws_caller_identity" "actual" {}
 
 # ------------------------------------------------------------------- DLQ
 # S3 invoca a Lambda de forma ASINCRONICA, por eso la DLQ se declara en el
-# event_invoke_config y no en el bloque dead_letter_config del trigger.
+# event_invoke_config y no en el trigger.
 resource "aws_sqs_queue" "dlq" {
   name                      = "${var.nombre}-dlq"
   message_retention_seconds = 345600 # 4 dias
@@ -17,8 +18,6 @@ resource "aws_sqs_queue" "dlq" {
 
 # ------------------------------------------------------------------- IAM
 data "aws_iam_policy_document" "asumir" {
-  count = var.crear_iam_propio ? 1 : 0
-
   statement {
     effect  = "Allow"
     actions = ["sts:AssumeRole"]
@@ -31,35 +30,25 @@ data "aws_iam_policy_document" "asumir" {
 }
 
 resource "aws_iam_role" "clasificador" {
-  count              = var.crear_iam_propio ? 1 : 0
   name               = "${local.funcion_name}-rol"
-  assume_role_policy = data.aws_iam_policy_document.asumir[0].json
+  assume_role_policy = data.aws_iam_policy_document.asumir.json
 }
 
-# Menor privilegio real: cada permiso acotado al recurso minimo. Es la matriz
-# IAM de la consigna expresada como codigo.
+# Menor privilegio: cada permiso acotado al recurso minimo. Es la matriz IAM
+# de la consigna expresada como codigo.
 data "aws_iam_policy_document" "permisos" {
-  count = var.crear_iam_propio ? 1 : 0
-
   statement {
-    sid       = "LeerFotosSinClasificar"
+    sid       = "LeerFotosSubidas"
     effect    = "Allow"
     actions   = ["s3:GetObject"]
-    resources = ["${var.bucket_arn}/${var.prefijo_entrada}*"]
-  }
-
-  statement {
-    sid       = "EscribirFotosClasificadas"
-    effect    = "Allow"
-    actions   = ["s3:PutObject"]
-    resources = ["${var.bucket_arn}/${var.prefijo_salida}*"]
+    resources = ["${var.bucket_arn}/${local.prefijo_entrada}*"]
   }
 
   statement {
     sid    = "ClasificarImagen"
     effect = "Allow"
     # DetectLabels no admite permisos a nivel de recurso: Rekognition no
-    # expone ARNs para esta operacion. Documentado, no es un descuido.
+    # expone ARNs para esta operacion.
     actions   = ["rekognition:DetectLabels"]
     resources = ["*"]
   }
@@ -87,40 +76,48 @@ data "aws_iam_policy_document" "permisos" {
 }
 
 resource "aws_iam_role_policy" "clasificador" {
-  count  = var.crear_iam_propio ? 1 : 0
   name   = "${local.funcion_name}-politica"
-  role   = aws_iam_role.clasificador[0].id
-  policy = data.aws_iam_policy_document.permisos[0].json
+  role   = aws_iam_role.clasificador.id
+  policy = data.aws_iam_policy_document.permisos.json
+}
+
+# El rol y su politica antes tenian count (respaldo para Learner Lab). Estos
+# bloques le dicen a Terraform que son los mismos recursos: sin ellos los
+# borraria y los volveria a crear.
+moved {
+  from = aws_iam_role.clasificador[0]
+  to   = aws_iam_role.clasificador
+}
+
+moved {
+  from = aws_iam_role_policy.clasificador[0]
+  to   = aws_iam_role_policy.clasificador
 }
 
 # ------------------------------------------------------------------- funcion
-# El log group se declara explicitamente para que Terraform controle la
-# retencion de 7 dias que exige la consigna. Si lo crea Lambda, queda "nunca
-# expira" y genera costo.
+# El log group se declara para que Terraform controle la retencion de 7 dias
+# que exige la consigna. Si lo crea Lambda, queda sin vencimiento.
 resource "aws_cloudwatch_log_group" "clasificador" {
   name              = local.log_group
-  retention_in_days = var.retencion_logs_dias
+  retention_in_days = 7
 }
 
 resource "aws_lambda_function" "clasificador" {
   function_name = local.funcion_name
-  role          = local.rol_arn
+  role          = aws_iam_role.clasificador.arn
   handler       = "clasificador.handler"
   runtime       = "python3.12"
-  architectures = ["arm64"] # Graviton: mismo rendimiento, 20% mas barato
+  architectures = ["arm64"] # Graviton: alrededor de 20% mas barato
 
   filename         = var.zip_path
   source_code_hash = var.zip_hash
 
-  memory_size = var.memoria_mb
-  timeout     = var.timeout_seg
+  memory_size = 256 # 128 se queda corto por la espera de red a Rekognition
+  timeout     = 30
 
   environment {
     variables = {
-      TABLA_DYNAMODB     = var.tabla_name
-      PREFIJO_SALIDA     = var.prefijo_salida
-      MIN_CONFIANZA      = tostring(var.min_confianza)
-      MOVER_CLASIFICADAS = tostring(var.mover_clasificadas)
+      TABLA_DYNAMODB = var.tabla_name
     }
   }
 
@@ -159,15 +156,10 @@ resource "aws_s3_bucket_notification" "fotos" {
   lambda_function {
     lambda_function_arn = aws_lambda_function.clasificador.arn
     events              = ["s3:ObjectCreated:*"]
-
-    # ESTE FILTRO ES LO QUE EVITA LA RECURSION. Si se quita y
-    # mover_clasificadas esta en true, la funcion se invoca a si misma en loop
-    # y cada vuelta es una llamada paga a Rekognition.
-    filter_prefix = var.prefijo_entrada
+    filter_prefix       = local.prefijo_entrada
   }
 
-  # Sin este depends_on, S3 intenta validar el destino antes de que exista el
-  # permiso y el apply falla. Es la dependencia circular clasica del par
-  # notification / permission.
+  # Sin este depends_on, S3 valida el destino antes de que exista el permiso y
+  # el apply falla.
   depends_on = [aws_lambda_permission.desde_s3]
 }

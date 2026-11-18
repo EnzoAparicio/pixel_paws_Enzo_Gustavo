@@ -15,5 +15,5 @@ output "dlq_url" {
 }
 
 output "rol_arn" {
-  value = local.rol_arn
+  value = aws_iam_role.clasificador.arn
 }

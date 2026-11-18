@@ -100,22 +100,12 @@ donde hay plata es en **no llamar a Rekognition**.
 
 | Medida | Ahorro estimado | Cómo |
 |---|---|---|
-| Deduplicación por hash del contenido | 10 a 30% según el caso de uso | Calcular SHA-256 de la foto, consultar DynamoDB antes de llamar a Rekognition y reutilizar las etiquetas si ya existe |
+| **Deduplicación antes de clasificar (implementada)** | Todo reprocesamiento de una foto ya conocida | La función consulta DynamoDB con `GetItem` antes de llamar a Rekognition. Si el archivo ya está, lo saltea. Mejora posible: deduplicar por hash del contenido, para detectar la misma foto subida con otro nombre |
 | Idempotencia del evento | Evita el reprocesamiento por reintentos | La clave primaria `archivo` ya impide duplicados en la tabla; agregar un `attribute_not_exists` en la condición de escritura |
 | Bajar `MinConfidence` y `MaxLabels` | USD 0 | No afecta el precio, se cobra por imagen y no por etiqueta. Mencionado para descartarlo explícitamente |
 | Retención de logs en 7 días | Mantiene CloudWatch en cero | Exigido por la consigna, ya contemplado |
 | Banderas `enable_*` en recursos con costo por hora | Evita el único riesgo real de factura | PixelPaws no usa NAT, balanceador, base gestionada ni clúster, así que no hay costo por hora en toda la arquitectura |
 
-### El riesgo de costo número uno
-
-No es el volumen, es la **recursión**. Si el extra de mover las fotos clasificadas a `/perros`
-y `/gatos` escribe en el mismo bucket y el filtro del evento no está acotado al prefijo
-`uploads/`, la función se invoca a sí misma en loop y cada iteración es una llamada paga a
-Rekognition. Es la única forma realista de generar una factura dolorosa en este proyecto.
-
-Mitigación: el notification del bucket filtra por `filter_prefix = "uploads/"`, las fotos
-clasificadas se escriben en `clasificadas/`, y la alarma de errores más el presupuesto al 50%
-avisan antes de que escale.
 
 ## 6. Evidencia a capturar para la defensa
 
