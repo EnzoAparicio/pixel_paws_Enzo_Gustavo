@@ -1,0 +1,28 @@
+# Estado: vive en S3, nunca en Git.
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+tfplan
+*.tfplan
+
+# Paquete de despliegue generado.
+terraform/.build/
+
+# Valores locales que pueden tener datos sensibles.
+*.auto.tfvars
+backend.local.hcl
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+
+# OneDrive: copias de conflicto ("archivo-NOMBREPC.ext") y metadatos de Windows.
+# Una copia de conflicto de un .tf duplicaria recursos y romperia el plan.
+*-Enzo.*
+*-ENZO.*
+desktop.ini
