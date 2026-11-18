@@ -60,7 +60,7 @@ el vault, como nota de Excalidraw.
 Desde AWS CloudShell, que ya viene autenticado:
 
 ```bash
-git clone [<este-repo>](https://github.com/EnzoAparicio/pixel_paws_Enzo_Gustavo.git) && cd pixelpaws
+git clone https://github.com/EnzoAparicio/pixel_paws_Enzo_Gustavo.git && cd pixelpaws
 bash bootstrap/bootstrap.sh
 ```
 
