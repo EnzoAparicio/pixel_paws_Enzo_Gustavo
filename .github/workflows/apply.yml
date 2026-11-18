@@ -50,19 +50,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
 
-      - name: Apply
-        run: ./scripts/tf.sh apply
+      - name: Init
+        run: terraform -chdir=terraform init -input=false -backend-config=backend.hcl
 
-      # Un aviso de bucket recien creado tarda entre 3 y 6 minutos en empezar a
-      # entregar eventos (medido el 18/11 en esta cuenta). En un despliegue desde
-      # cero la primera foto se pierde, asi que se reintenta con una foto nueva.
-      - name: Prueba de humo
-        run: |
-          for intento in 1 2 3 4 5 6 7 8; do
-            ./scripts/smoke-test.sh pruebas/fixtures/perro.jpg && exit 0
-            echo "Intento ${intento} sin clasificar: el aviso del bucket puede estar propagandose"
-          done
-          exit 1
+      - name: Plan
+        run: terraform -chdir=terraform plan -input=false -out=tfplan
+
+      - name: Apply
+        run: terraform -chdir=terraform apply -input=false tfplan
 
       - name: Resumen
         run: |

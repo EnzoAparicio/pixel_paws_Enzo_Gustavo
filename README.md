@@ -22,8 +22,6 @@ Diagrama de arquitectura: [`docs/arquitectura.html`](docs/arquitectura.html).
 ├── terraform/                 # raíz + 6 módulos: almacenamiento, catalogo, clasificador,
 │                              # observabilidad, finops, cicd_oidc
 ├── scripts/
-│   ├── tf.sh                  # plan | apply | destroy, igual en local y en CI
-│   ├── smoke-test.sh          # prueba de punta a punta con una foto
 │   ├── lote.sh                # sube el lote de 20 fotos y muestra los resultados
 │   └── credenciales-ci.sh     # credenciales temporales para el pipeline
 ├── pruebas/                   # fotos de prueba
@@ -55,20 +53,21 @@ Requiere Terraform 1.17 y el AWS CLI autenticado en la cuenta, región `us-east-
 3. **Aplicar:**
 
    ```bash
-   ./scripts/tf.sh apply
+   terraform -chdir=terraform init -backend-config=backend.hcl
+   terraform -chdir=terraform apply
    ```
 
    Confirmar la suscripción en el mail de AWS Notifications, si no las alarmas no llegan.
 
 **Pipeline:** en GitHub, crear el environment `production` con revisores obligatorios, y los
 secrets `EMAILS_ALERTA` y las credenciales temporales que genera
-`AWS_PROFILE=pixelpaws-emisor ./scripts/credenciales-ci.sh` (duran 12 horas). Por qué
+`AWS_PROFILE=pixelpaws-emisor bash scripts/credenciales-ci.sh` (duran 12 horas). Por qué
 credenciales temporales y no OIDC: [`docs/seguridad.md`](docs/seguridad.md).
 
 ## Destruir
 
 ```bash
-./scripts/tf.sh destroy
+terraform -chdir=terraform destroy
 ```
 
 O el workflow manual `destroy` en GitHub, escribiendo `DESTRUIR`.

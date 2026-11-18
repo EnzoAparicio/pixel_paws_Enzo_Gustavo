@@ -8,7 +8,7 @@
 # Duracion: desde un usuario IAM, hasta 12 h. Desde un rol asumido (la sesion
 # federada de la consola), AWS limita el encadenamiento de roles a 1 h.
 #
-# Uso: ./scripts/credenciales-ci.sh [horas]
+# Uso: bash scripts/credenciales-ci.sh [horas]
 set -euo pipefail
 
 HORAS="${1:-12}"
