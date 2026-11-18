@@ -1,15 +1,3 @@
----
-up:
-  - "[[Cloud Computing MOC]]"
-related:
-  - "[[Plan PixelPaws Pets - proyecto integrador]]"
-created: 2026-11-11
-tema: "Decisión de cuenta para el proyecto integrador PixelPaws Pets y cómo se cubren las brechas del entorno Learner Lab"
-tipo: decision
-in:
-  - "[[Cloud Computing MOC]]"
----
-
 # Decisión 01 - cuenta y entorno
 
 > Esta nota es un entregable en sí misma. El criterio de Arquitectura (30%) evalúa
