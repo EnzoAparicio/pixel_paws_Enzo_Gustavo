@@ -44,8 +44,19 @@ jobs:
       - name: Init
         run: terraform -chdir=terraform init -input=false -backend-config=backend.hcl
 
+      # Destruye todo menos module.cicd_oidc: es la identidad con la que corre este
+      # mismo job. Si se borrara en paralelo, el resto del destroy queda sin permisos
+      # (AccessDenied a mitad de camino) y el proximo apply no podria autenticarse.
+      # Para la limpieza final, cicd_oidc se destruye a mano con un usuario admin.
       - name: Destroy
-        run: terraform -chdir=terraform destroy -input=false -auto-approve
+        run: |
+          terraform -chdir=terraform destroy -input=false -auto-approve \
+            -target=module.almacenamiento \
+            -target=module.catalogo \
+            -target=module.clasificador \
+            -target=module.observabilidad \
+            -target=module.finops \
+            -target=random_id.sufijo
 
       - name: Evidencia de cuenta limpia
         run: |
