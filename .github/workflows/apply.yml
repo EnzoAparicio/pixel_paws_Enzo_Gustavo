@@ -34,6 +34,15 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
+      - name: Validar ARN del rol OIDC
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+        run: |
+          if [ -z "$AWS_ROLE_ARN" ]; then
+            echo "::error::Falta el secret AWS_ROLE_ARN. Cargá el valor de 'terraform -chdir=terraform output -raw rol_github_arn' en Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
       # OIDC: GitHub pide un token de corta vida y asume el rol. Sin claves guardadas.
       - name: Credenciales AWS
         uses: aws-actions/configure-aws-credentials@v5

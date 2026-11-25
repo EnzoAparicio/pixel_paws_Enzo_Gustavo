@@ -424,8 +424,10 @@ aws s3api get-object --bucket <bucket-del-estado> \
 
 Con OIDC, revisá tres cosas en este orden: que el flujo tenga `permissions: id-token: write`,
 que el secret `AWS_ROLE_ARN` exista y esté bien copiado, y que el repositorio sea el mismo con el
-que se aplicó Terraform. Si lo moviste de propietario o lo renombraste, la condición `sub` del
-rol ya no coincide y hay que volver a correr `apply`.
+que se aplicó Terraform. Si el job informa que falta `AWS_ROLE_ARN`, cargá en *Settings → Secrets
+and variables → Actions* el valor de `terraform -chdir=terraform output -raw rol_github_arn`
+(sección 8.1) y volvé a ejecutar el flujo. Si lo moviste de propietario o lo renombraste, la
+condición `sub` del rol ya no coincide y hay que volver a correr `apply`.
 
 ### Se borró un recurso a mano desde la consola
 
