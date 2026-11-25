@@ -1,9 +1,12 @@
 name: apply
 
 # En merge a main: apply con aprobacion manual del environment production.
+# Tambien se puede disparar a mano desde Actions (Run workflow), por ejemplo
+# para volver a desplegar antes de una demo. Pasa por la misma aprobacion.
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
