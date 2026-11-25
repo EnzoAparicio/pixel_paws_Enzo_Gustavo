@@ -76,6 +76,10 @@ data "aws_iam_policy_document" "presupuestos" {
     actions = [
       "budgets:ViewBudget",
       "budgets:ModifyBudget",
+      # El provider lee y escribe los tags del presupuesto en cada plan/apply.
+      "budgets:ListTagsForResource",
+      "budgets:TagResource",
+      "budgets:UntagResource",
     ]
     resources = ["*"]
   }
