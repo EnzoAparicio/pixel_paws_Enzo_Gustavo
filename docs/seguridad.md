@@ -16,28 +16,55 @@ Otras identidades:
 
 | Identidad | Permisos | Justificación |
 |---|---|---|
-| Rol `pixelpaws-ci` | `AdministratorAccess` | El pipeline crea roles, políticas y el presupuesto. Solo entrega credenciales temporales, de 12 horas como máximo |
+| Rol `pixelpaws-dev-github-actions` | Siete políticas por servicio más una en línea para presupuestos | Lo asume GitHub Actions por OIDC. **No tiene `AdministratorAccess`**: solo S3, Lambda, DynamoDB, SQS, CloudWatch, SNS, IAM y Budgets. Sesiones de 1 hora |
 | Usuario IAM `gustavo` | `AdministratorAccess` | Acceso por CLI del segundo integrante. Se borra al cerrar el proyecto |
-| Usuario IAM `pixelpaws-emisor` | solo `sts:AssumeRole` sobre `pixelpaws-ci` | Genera las credenciales de 12 horas del pipeline. Su clave vive solo en la PC de un integrante, nunca en el repositorio ni en GitHub. Se borra al cerrar el proyecto |
 
-## Autenticación del pipeline
+## Autenticación del pipeline: OIDC
 
-OIDC es la forma correcta de autenticar GitHub Actions contra AWS, y es lo que este
-repositorio tiene escrito. Lo que no se puede es crear el proveedor OIDC **en esta cuenta**: el
-plan Free de AWS la ubica dentro de una organización administrada por AWS, con una política de
-control de servicios (SCP) que prevalece sobre los permisos de la cuenta y niega ese recurso. No
-es una limitación del servicio, es el techo que pone la organización. Verificación y resultados
-posibles: `docs/Decision 01 - cuenta AWS Academy y brechas de la consigna.md`.
+**No hay ninguna clave de AWS guardada en GitHub.** El pipeline se autentica con OpenID Connect,
+que es la forma recomendada por AWS para GitHub Actions.
 
-En su lugar, el pipeline recibe **credenciales temporales** del rol `pixelpaws-ci`, generadas con
-`scripts/credenciales-ci.sh`. Vencen solas: 12 horas desde un usuario IAM (se usa
-`pixelpaws-emisor`, que solo puede asumir ese rol), 1 hora desde una sesión federada. No hay claves de acceso permanentes en el repositorio ni en los secrets.
+Cómo funciona, en cuatro pasos:
 
-El código de OIDC está escrito en `terraform/modules/cicd_oidc`, con `enable_oidc = false`:
+1. GitHub Actions le pide a GitHub un token de identidad firmado para esa ejecución concreta.
+   Ese token dice qué repositorio, qué rama y qué flujo lo pidieron.
+2. El flujo se lo presenta a AWS STS junto con el ARN del rol que quiere asumir.
+3. AWS valida la firma contra el proveedor OIDC `token.actions.githubusercontent.com`, que está
+   registrado en la cuenta, y comprueba las dos condiciones de la política de confianza.
+4. Si pasa, STS devuelve credenciales que **viven una hora y mueren solas**.
 
-```bash
-terraform -chdir=terraform plan -var enable_oidc=true
-```
+Las dos condiciones de confianza están en `terraform/modules/cicd_oidc/main.tf`:
+
+| Condición | Valor | Para qué |
+|---|---|---|
+| `...:aud` | `sts.amazonaws.com` | El token tiene que haber sido emitido para STS, no para otro servicio |
+| `...:sub` | `repo:OWNER/REPO:*` | **Solo este repositorio** puede asumir el rol. Otro repositorio, aunque esté en GitHub, no entra |
+
+El rol se llama `pixelpaws-dev-github-actions` y **no tiene `AdministratorAccess`**: lleva siete
+políticas gestionadas acotadas a los servicios que el proyecto usa, más una política en línea
+para presupuestos, porque ninguna política gestionada de AWS cubre `budgets:ModifyBudget`.
+Las sesiones duran 1 hora (`max_session_duration = 3600`).
+
+El único secret de GitHub relacionado con AWS es `AWS_ROLE_ARN`, que es el ARN del rol. **Un ARN
+no es un secreto**: sin un token OIDC válido emitido para el repositorio autorizado, conocerlo no
+sirve de nada. Se guarda como secret por prolijidad, no por necesidad.
+
+### Qué se gana contra el esquema anterior
+
+El proyecto funcionó un tiempo con credenciales temporales de 12 horas generadas a mano con
+`scripts/credenciales-ci.sh`, porque se creía que la cuenta no permitía crear el proveedor OIDC.
+Resultó que sí lo permite. La diferencia es concreta:
+
+| | Credenciales temporales | OIDC |
+|---|---|---|
+| Vida | 12 horas | 1 hora, por ejecución |
+| Renovación | Manual, alguien corre un script | Automática |
+| Qué se guarda en GitHub | Tres secrets con una credencial real | Un ARN |
+| Si se filtran | Hay 12 horas de ventana | No hay nada que filtrar |
+| Permisos | `AdministratorAccess` | Siete servicios acotados |
+
+El script `scripts/credenciales-ci.sh` y el rol `pixelpaws-ci` se conservan como camino de
+respaldo, por si hiciera falta operar desde una cuenta donde OIDC no esté disponible.
 
 ## Hallazgos aceptados de Checkov
 

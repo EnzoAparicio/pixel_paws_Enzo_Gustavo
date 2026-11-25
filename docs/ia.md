@@ -42,10 +42,12 @@ PR, Checkov con 57 controles en verde, el lote de 20 fotos con 20 aciertos, el c
 disparado a propósito y un ciclo completo de `destroy` y `apply`. **Ningún número de este
 repositorio salió de una estimación de la IA**: todos están medidos.
 
-También hubo errores. El más caro: la [Decisión 01](Decision%2001%20-%20cuenta%20AWS%20Academy%20y%20brechas%20de%20la%20consigna.md)
-afirmaba que la cuenta tenía OIDC disponible, cosa razonable para una cuenta normal de AWS pero
-falsa para la nuestra, y nadie lo verificó antes de escribirlo. El error apareció recién al
-intentarlo, con el pipeline ya diseñado. De ahí sale el primer lineamiento.
+También hubo errores, y el más caro fue nuestro. Un intento fallido de crear el proveedor OIDC,
+cuyo mensaje de error nadie guardó, nos llevó a concluir que la cuenta lo bloqueaba. La
+explicación era verosímil y la dimos por buena sin probarla. Sobre esa premisa rediseñamos el
+pipeline entero con credenciales temporales. Una semana después lo probamos y **el proveedor se
+creó sin error**: la premisa era falsa y hubo que deshacer el rediseño. De ahí sale el primer
+lineamiento.
 
 **La conclusión: la IA sirve para proponer y para explicar, no para confirmar. Lo que confirma
 es la consola.**

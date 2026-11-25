@@ -42,9 +42,9 @@ variable "region" {
 }
 
 variable "enable_oidc" {
-  description = "Crea el proveedor OIDC de GitHub y el rol que asume el pipeline. La organizacion de la cuenta lo bloquea, por eso va en false."
+  description = "Crea el proveedor OIDC de GitHub y el rol que asume el pipeline. Es la forma de autenticar sin claves."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "repositorio_github" {

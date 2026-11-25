@@ -106,8 +106,7 @@ resource "aws_lambda_function" "clasificador" {
   memory_size = 256 # 128 se queda corto por la espera de red a Rekognition
   timeout     = 30
 
-  # Tope de gasto: nunca mas de 10 clasificaciones a la vez.
-  reserved_concurrent_executions = 10
+  # Sin reserva: la cuenta tope 10 concurrentes, y AWS exige dejar 10 sin reservar.
 
   environment {
     variables = {

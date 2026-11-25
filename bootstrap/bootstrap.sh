@@ -28,7 +28,7 @@ aws s3api put-public-access-block --bucket "$BUCKET" \
   --public-access-block-configuration \
   "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 
-echo ">> Rol del pipeline (OIDC esta bloqueado por la organizacion de la cuenta)"
+echo ">> Rol de respaldo del pipeline (el pipeline normal entra por OIDC)"
 CUENTA="$(aws sts get-caller-identity --query Account --output text)"
 if aws iam get-role --role-name pixelpaws-ci >/dev/null 2>&1; then
   echo "   pixelpaws-ci ya existe, no se toca"

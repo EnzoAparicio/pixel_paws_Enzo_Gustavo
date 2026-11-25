@@ -34,12 +34,10 @@ Todo se despliega en **`us-east-2` (Ohio)**. La región está fijada como valor 
 que son las de menor costo.
 
 > **Sobre esta cuenta en particular.** La cuenta usada en el proyecto está dentro de una
-> organización administrada por AWS, con una política de control de servicios (SCP) que solo
-> habilita `us-east-2`, niega las contraseñas de consola para usuarios IAM y **niega crear
-> proveedores OIDC**. Eso condiciona el paso 8. El detalle está en
+> organización administrada por AWS, con una política de control de servicios que solo habilita
+> `us-east-2` y niega las contraseñas de consola para usuarios IAM. Eso no afecta al despliegue:
+> se trabaja por CLI y en una sola región. El detalle está en
 > [`Decision 01`](Decision%2001%20-%20cuenta%20AWS%20Academy%20y%20brechas%20de%20la%20consigna.md).
-> En una cuenta sin esa restricción, OIDC funciona: el código está escrito y se activa con
-> `enable_oidc = true`.
 
 ### Dónde correr los comandos
 
@@ -115,7 +113,7 @@ El script hace cuatro cosas sobre el bucket y una quinta sobre IAM:
 | Versionado | Permite volver atrás si el estado se corrompe |
 | Cifrado AES256 en reposo | El estado contiene nombres de recursos y ARNs |
 | Bloqueo de acceso público | El estado nunca debe ser legible desde Internet |
-| Rol `pixelpaws-ci` | Lo asume el pipeline. Sesiones de hasta 12 horas |
+| Rol `pixelpaws-ci` | Respaldo para cuentas sin OIDC. El pipeline normal no lo usa |
 
 Al terminar imprime el nombre del bucket. **Copiarlo**: va en el paso siguiente.
 
@@ -272,7 +270,7 @@ aws logs tail "/aws/lambda/$(terraform -chdir=terraform output -raw funcion)" --
 # cuántos mensajes hay en la cola de errores
 aws sqs get-queue-attributes --region us-east-2 \
   --queue-url "$(terraform -chdir=terraform output -raw dlq)" \
-  --attribute-names ApproximateNumberOfMessagesVisible
+  --attribute-names ApproximateNumberOfMessages
 
 # estado de la alarma
 aws cloudwatch describe-alarms --region us-east-2 \
@@ -321,7 +319,7 @@ La alarma vuelve a `OK` sola unos minutos después.
 
 ### Costos
 
-El presupuesto está fijado en **USD 10 al mes** y avisa por correo al 80 % y al 100 %. El costo
+El presupuesto está fijado en **USD 10 al mes** y avisa por correo al 50, 80 y 100 %. El costo
 real del proyecto completo, incluyendo desarrollo, lote y demo, fue de **USD 0,0021**. La
 proyección a 100.000 fotos por mes es de unos **USD 105**, de los cuales el 95 % es Rekognition.
 El desglose está en
@@ -341,29 +339,36 @@ Tres flujos de trabajo:
 
 ### 8.1 Cómo entra GitHub a AWS
 
-Lo correcto sería OIDC, y el código está escrito en el módulo `cicd_oidc`. **Está apagado**
-(`enable_oidc = false`) porque la SCP de la organización niega crear el proveedor. En su lugar:
+El pipeline entra por **OIDC**: no hay ninguna clave de AWS guardada en GitHub. Cada ejecución
+pide un token de identidad firmado, lo presenta a AWS STS y recibe credenciales de una hora.
 
-1. Un usuario IAM llamado `pixelpaws-emisor` cuyo **único permiso es `sts:AssumeRole`** sobre el
-   rol `pixelpaws-ci`. No puede hacer nada más en la cuenta.
-2. Ese usuario asume `pixelpaws-ci` y obtiene credenciales temporales de 12 horas.
-3. Esas credenciales se cargan como secrets de GitHub.
+El proveedor OIDC y el rol los crea Terraform (módulo `cicd_oidc`, con `enable_oidc = true`), así
+que después del `apply` del paso 4 ya existen. Solo falta decirle a GitHub qué rol asumir:
+
+```bash
+terraform -chdir=terraform output -raw rol_github_arn
+```
+
+Ese ARN va a *Settings → Secrets and variables → Actions* como secret **`AWS_ROLE_ARN`**. No
+vence y no hay que renovarlo nunca. Un ARN no es un secreto: sin un token OIDC emitido para este
+repositorio, conocerlo no sirve de nada.
+
+Hace falta además el secret `EMAILS_ALERTA` con la misma lista JSON del paso 4.1.
+
+> **El repositorio importa.** La política de confianza del rol se construye con
+> `var.repositorio_github`, que los flujos pasan como `${{ github.repository }}`. Si movés el
+> repositorio a otro propietario o lo renombrás, hay que volver a correr `apply` para que la
+> condición apunte al nombre nuevo, o el pipeline deja de poder entrar.
+
+**Camino de respaldo.** En una cuenta donde no se pueda crear el proveedor OIDC, como el Learner
+Lab, se pone `enable_oidc = false` y se usan credenciales temporales de 12 horas:
 
 ```bash
 AWS_PROFILE=pixelpaws-emisor bash scripts/credenciales-ci.sh
 ```
 
-Si `gh` está autenticado, el script carga los tres secrets solo. Si no, los imprime para pegarlos
-a mano en *Settings → Secrets and variables → Actions*:
-
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_SESSION_TOKEN`
-
-**Vencen a las 12 horas.** Si el pipeline falla con un error de credenciales expiradas, se vuelve
-a correr el script. Nunca se guarda una clave permanente en el repositorio ni en los secrets.
-
-Hace falta además el secret `EMAILS_ALERTA` con la misma lista JSON del paso 4.1. Ese no vence.
+Carga los secrets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` y `AWS_SESSION_TOKEN`, que vencen
+a las 12 horas y hay que renovar a mano. Los flujos hay que ajustarlos para usarlos.
 
 ### 8.2 Entorno con aprobación
 
@@ -417,8 +422,10 @@ aws s3api get-object --bucket <bucket-del-estado> \
 
 ### El pipeline no puede entrar a AWS
 
-Casi siempre son las credenciales temporales vencidas: duran 12 horas. Volver a correr
-`scripts/credenciales-ci.sh`.
+Con OIDC, revisá tres cosas en este orden: que el flujo tenga `permissions: id-token: write`,
+que el secret `AWS_ROLE_ARN` exista y esté bien copiado, y que el repositorio sea el mismo con el
+que se aplicó Terraform. Si lo moviste de propietario o lo renombraste, la condición `sub` del
+rol ya no coincide y hay que volver a correr `apply`.
 
 ### Se borró un recurso a mano desde la consola
 
@@ -440,9 +447,10 @@ prefijo `uploads/` y la función los reprocesa.
 | Error | Causa | Solución |
 |---|---|---|
 | `IllegalLocationConstraintException` | Crear un bucket fuera de `us-east-1` sin `LocationConstraint` | Ya corregido en `bootstrap.sh` |
+| `InvalidParameterValueException ... UnreservedConcurrentExecution below its minimum value of [10]` | La cuenta tiene un tope de 10 ejecuciones concurrentes de Lambda y AWS exige dejar 10 sin reservar | No usar `reserved_concurrent_executions`: con un tope de 10, la reserva es imposible y redundante |
 | `Error acquiring the state lock` | Otro apply corriendo o cortado | Esperar, o `force-unlock` |
-| `AccessDenied ... explicit deny in a service control policy` | La SCP de la organización bloquea la acción | No se puede sortear desde la cuenta. Ver `Decision 01` |
-| `ExpiredToken` en el pipeline | Credenciales de 12 h vencidas | Volver a correr `credenciales-ci.sh` |
+| `AccessDenied ... explicit deny in a service control policy` | La politica de la organizacion bloquea esa accion, por ejemplo otra region | No se puede sortear desde la cuenta. Ver `Decision 01` |
+| `Not authorized to perform sts:AssumeRoleWithWebIdentity` | El repositorio no coincide con la condicion `sub` del rol | Volver a correr `apply` con el nombre correcto del repositorio |
 | La alarma no manda correo | Suscripción sin confirmar | Paso 5.1 |
 | El presupuesto marca USD 0 con gasto real | Etiqueta de costos sin activar | Paso 5.2 |
 | `fmt -check` falla en el CI | Algún `.tf` sin formatear | `terraform fmt -recursive terraform/` |
@@ -466,7 +474,7 @@ Después del `destroy` quedan tres cosas que Terraform no gestiona, porque son a
 las versiones antiguas. Desde la consola de S3, sobre el bucket `tfstate-pixelpaws-...`:
 **Empty** y después **Delete**.
 
-**2. El rol `pixelpaws-ci` y el usuario `pixelpaws-emisor`:**
+**2. El rol `pixelpaws-ci`**, que crea `bootstrap.sh` y que el pipeline con OIDC no usa:
 
 ```bash
 aws iam detach-role-policy --role-name pixelpaws-ci \
@@ -474,10 +482,10 @@ aws iam detach-role-policy --role-name pixelpaws-ci \
 aws iam delete-role --role-name pixelpaws-ci
 ```
 
-Para el usuario hay que borrar primero sus access keys, listándolas con
-`aws iam list-access-keys --user-name pixelpaws-emisor`.
+El proveedor OIDC y el rol `pixelpaws-dev-github-actions` los borra `terraform destroy`, porque
+los creó Terraform.
 
-**3. Los secrets de GitHub.** Las credenciales ya vencieron solas, pero conviene borrarlas.
+**3. Los secrets de GitHub.** `AWS_ROLE_ARN` apunta a un rol que ya no existe: conviene borrarlo.
 
 ### Verificar que no quedó nada
 

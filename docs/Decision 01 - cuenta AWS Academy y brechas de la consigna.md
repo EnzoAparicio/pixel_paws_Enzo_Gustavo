@@ -25,7 +25,7 @@ reutilizar**. La decisión se toma desde cero.
 
 | Opción                           | Veredicto                                                                                                                                                                                                                        |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Cuenta AWS propia, plan Free** | **Elegida.** USD 100 de crédito al alta (más hasta USD 100 por actividades), 6 meses, sin posibilidad de generar cargos en el plan Free. IAM completo y AWS Budgets disponibles. OIDC se dio por disponible y resultó bloqueado: ver la corrección de abajo. Alta en 15 minutos, sin depender de nadie |
+| **Cuenta AWS propia, plan Free** | **Elegida.** USD 100 de crédito al alta (más hasta USD 100 por actividades), 6 meses, sin posibilidad de generar cargos en el plan Free. IAM completo, OIDC y AWS Budgets disponibles. Alta en 15 minutos, sin depender de nadie |
 | AWS Academy Learner Lab          | Contingencia. Todos los servicios de PixelPaws están habilitados, pero IAM no permite crear roles, no hay OIDC y no existe AWS Budgets. Además la inscripción depende de que el docente invite, y no hay invitación              |
 | Azure for Students               | USD 100 sin tarjeta y OIDC de primera clase, pero obliga a aprender Entra ID, Event Grid y Cosmos DB desde cero con una semana disponible                                                                                        |
 | Skill Builder                    | Simulación. No sirve para Terraform                                                                                                                                                                                              |
@@ -38,34 +38,35 @@ Salvedades asumidas: AWS suele pedir un medio de pago para verificar identidad (
 USD 1 que se devuelve), y el plan Free excluye algunos servicios de alto consumo sin listarlos.
 Rekognition no es uno de ellos, pero la prueba de humo del final sigue siendo obligatoria.
 
-### Corrección del 19/11: OIDC se dio por disponible y no lo estaba
+### El episodio OIDC: una conclusión apurada que estuvo mal una semana
 
-La fila de arriba se escribió antes de tener la cuenta en la mano. Al probarla, el 18/11, crear
-el proveedor OIDC de GitHub falló. La causa: la cuenta del plan Free vive dentro de una
-organización administrada por AWS, con una política de control de servicios (SCP) que prevalece
-sobre los permisos de la cuenta. Esa política habilita solo `us-east-2`, niega las contraseñas de
-consola para usuarios IAM y niega crear proveedores OIDC.
+Vale la pena dejarlo escrito porque es el error de método más caro que cometimos.
 
-**OIDC funciona en AWS** y es la forma correcta de autenticar GitHub Actions. Lo que no se puede
-es crear el proveedor **en esta cuenta**. No es una limitación del servicio: es el techo que pone
-la organización.
+El 18/11, el primer intento de crear el proveedor OIDC de GitHub falló. Sin guardar el mensaje
+de error, concluimos que la cuenta lo bloqueaba y le buscamos una explicación: la cuenta del plan
+Free vive dentro de una organización administrada por AWS, con una política de control de
+servicios (SCP) que prevalece sobre los permisos de la cuenta. Como esa política efectivamente
+restringe otras cosas (solo habilita `us-east-2` y niega las contraseñas de consola para usuarios
+IAM), la explicación cerraba.
 
-AWS no publica el contenido de esa SCP, así que la única evidencia válida es el mensaje de error
-de la propia cuenta. Se obtiene así, desde una identidad de la cuenta:
+Sobre esa conclusión rediseñamos el pipeline entero: credenciales temporales de 12 horas
+generadas a mano, un usuario IAM emisor, un rol intermedio y un script para renovarlas.
 
-```bash
-aws iam list-open-id-connect-providers
-aws iam create-open-id-connect-provider   --url https://token.actions.githubusercontent.com   --client-id-list sts.amazonaws.com
-```
+**El 25/11 lo volvimos a probar y el proveedor se creó sin ningún error.** La SCP no bloquea
+OIDC. La conclusión era falsa, y el rediseño completo del pipeline se hizo sobre una premisa que
+nunca se verificó.
 
-| Resultado | Qué significa |
-|---|---|
-| `AccessDenied` que menciona `explicit deny in a service control policy` | Confirma el bloqueo. El texto del error va a `docs/seguridad.md` |
-| `EntityAlreadyExists` | El proveedor ya existe en la cuenta: OIDC es usable referenciando el existente, no creándolo |
-| `AccessDenied` sin mencionar la SCP | Falta el permiso `iam:CreateOpenIDConnectProvider` en la identidad que lo intentó |
-| Se crea sin error | OIDC es usable: se borra el proveedor y se aplica con `enable_oidc = true` |
+Tres cosas que quedan de esto:
 
-Mientras ese error no esté guardado, esta nota describe una medición sin respaldo escrito.
+1. **Un error sin guardar no es evidencia.** Nadie copió el mensaje del 18/11, así que durante
+   una semana la documentación afirmó una causa que nadie podía comprobar.
+2. **Una explicación que encaja no es una explicación verificada.** La SCP existía y restringía
+   otras cosas, y eso hizo verosímil la hipótesis. Verosímil no es verdadero.
+3. **La verificación costaba dos minutos.** El rediseño del pipeline costó varios días.
+
+Cómo quedó: el pipeline usa OIDC, con `enable_oidc = true`. El camino de las credenciales
+temporales se conserva en `scripts/credenciales-ci.sh` como respaldo para una cuenta donde OIDC
+no esté disponible.
 
 
 ## Verificación de servicios
@@ -126,13 +127,11 @@ Con la cuenta propia confirmada, el respaldo para Learner Lab dejó de tener sen
 ya no existen las banderas `crear_iam_propio` ni `enable_budget`. El rol de menor privilegio de
 la función y el presupuesto se crean siempre.
 
-Queda una sola bandera, `enable_oidc = false`, porque la organización que administra la cuenta
-del plan Free bloquea los proveedores OIDC (ver `docs/seguridad.md`). El código de OIDC está
-escrito y se puede mostrar sin aplicarlo:
-
-```
-terraform plan -var enable_oidc=true
-```
+Queda una sola bandera, `enable_oidc`, en `true`: el pipeline se autentica con OIDC y no hay
+ninguna clave de AWS guardada en GitHub. Se deja como bandera y no como código fijo porque hay
+entornos, como el propio Learner Lab, donde crear el proveedor no está permitido; en ese caso se
+pone en `false` y se vuelve al camino de respaldo. El detalle de cómo funciona está en
+`docs/seguridad.md`.
 
 ## Impacto estimado en la rúbrica
 

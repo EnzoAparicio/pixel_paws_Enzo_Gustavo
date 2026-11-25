@@ -1,5 +1,5 @@
 # Bucket creado por bootstrap.sh; se versiona porque el pipeline lo necesita para el init.
-bucket = "tfstate-pixelpaws-31497"
+bucket = "tfstate-pixelpaws-10385"
 key    = "pixelpaws/dev/terraform.tfstate"
 region = "us-east-2"
 

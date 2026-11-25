@@ -28,7 +28,7 @@ correo.
 |---|---|
 | Entender el proyecto completo | [`docs/informe.md`](docs/informe.md), 16 secciones con diagramas y el porqué de cada decisión |
 | Desplegarlo desde cero | [`docs/runbook.md`](docs/runbook.md), paso a paso, unos 40 minutos |
-| Ver la arquitectura | [`docs/arquitectura.html`](docs/arquitectura.html) (abrir en el navegador) o [`docs/diagramas/`](docs/diagramas/) |
+| Ver la arquitectura | [`docs/arquitectura.md`](docs/arquitectura.md), tres diagramas y lo que dejan decidido |
 | Revisar la seguridad | [`docs/seguridad.md`](docs/seguridad.md): matriz IAM, autenticación del pipeline y hallazgos de Checkov |
 | Ver los costos | [`docs/FinOps - estimacion y proyeccion PixelPaws.md`](docs/FinOps%20-%20estimacion%20y%20proyeccion%20PixelPaws.md) |
 | Saber cómo se usó la IA | [`docs/ia.md`](docs/ia.md): herramientas, prompts, lineamientos y qué salió mal |
@@ -40,12 +40,12 @@ correo.
 |---|---|---|
 | Entrada | **Amazon S3** | Bucket privado. Solo el prefijo `uploads/` dispara el proceso |
 | Disparador | **Notificación de S3** | Evento `ObjectCreated` filtrado por prefijo, invocación asincrónica |
-| Cómputo | **AWS Lambda** | Python 3.12 sobre arm64, 256 MB, 30 s, concurrencia reservada en 10 |
+| Cómputo | **AWS Lambda** | Python 3.12 sobre arm64, 256 MB, 30 s |
 | Clasificación | **Amazon Rekognition** | `DetectLabels` con confianza mínima de 70 y hasta 10 etiquetas |
 | Catálogo | **Amazon DynamoDB** | Bajo demanda. Guarda `{archivo, etiqueta, confianza, fecha}` |
 | Errores | **Amazon SQS** | Cola de mensajes fallidos, retención de 4 días |
 | Alerta | **CloudWatch + SNS** | Alarma sobre mensajes en la cola, notificación por correo |
-| Costos | **AWS Budgets** | Tope de USD 10 al mes, avisos al 80 % y al 100 % |
+| Costos | **AWS Budgets** | Tope de USD 10 al mes, avisos al 50, 80 y 100 % |
 
 Dos decisiones que suelen generar preguntas:
 
@@ -67,7 +67,7 @@ Dos decisiones que suelen generar preguntas:
 │                              # observabilidad, finops, cicd_oidc
 ├── scripts/
 │   ├── lote.sh                # sube el lote de 20 fotos y muestra los resultados
-│   └── credenciales-ci.sh     # credenciales temporales para el pipeline
+│   └── credenciales-ci.sh     # respaldo: credenciales temporales si no hay OIDC
 ├── pruebas/lote/              # las 20 fotos de prueba
 ├── docs/                      # informe, runbook, arquitectura, seguridad, FinOps, IA
 │   ├── diagramas/             # 11 diagramas, con sus editables de Excalidraw
@@ -122,15 +122,18 @@ camino de error, el runbook explica cómo disparar la cola de errores y la alarm
 | `apply` | Al mergear a `main` | `apply` con aprobación manual del entorno `production` |
 | `destroy` | Manual | Destruye todo y deja evidencia de que la cuenta quedó limpia |
 
-**Cómo entra GitHub a AWS.** Lo correcto sería OIDC, y el código está escrito en el módulo
-`cicd_oidc`. Está apagado (`enable_oidc = false`) porque la cuenta vive dentro de una
-organización administrada por AWS cuya política de control de servicios niega crear proveedores
-OIDC. En su lugar, un usuario IAM cuyo único permiso es `sts:AssumeRole` genera credenciales
-temporales de 12 horas con `scripts/credenciales-ci.sh`. Nunca hay claves permanentes en el
-repositorio ni en los secrets.
+**Cómo entra GitHub a AWS: OIDC.** No hay ninguna clave de AWS guardada en GitHub. Cada
+ejecución le pide a GitHub un token de identidad firmado, se lo presenta a AWS STS y recibe
+credenciales que **viven una hora y mueren solas**. La política de confianza del rol exige que
+el token venga de este repositorio y esté emitido para STS, así que ningún otro repositorio
+puede asumirlo.
 
-Esto no es una limitación de AWS: en una cuenta sin esa restricción, OIDC funciona. Se puede
-ver con `terraform plan -var enable_oidc=true`. El detalle está en
+El rol que se asume no tiene `AdministratorAccess`: lleva siete políticas acotadas a los
+servicios del proyecto. El único secret es `AWS_ROLE_ARN`, y un ARN no es un secreto.
+
+Para cuentas donde no se pueda crear el proveedor OIDC, como el Learner Lab, queda el camino de
+respaldo: `enable_oidc = false` y credenciales temporales con `scripts/credenciales-ci.sh`. El
+detalle está en
 [`docs/seguridad.md`](docs/seguridad.md) y en
 [`docs/Decision 01`](docs/Decision%2001%20-%20cuenta%20AWS%20Academy%20y%20brechas%20de%20la%20consigna.md).
 
@@ -144,5 +147,5 @@ O el flujo manual `destroy` en GitHub, que pide la aprobación del entorno `prod
 
 Quedan fuera del estado de Terraform, porque son anteriores a él: el bucket del estado (se borra
 desde la consola de S3 con **Empty** y después **Delete**, porque tiene versionado y
-`aws s3 rb --force` no alcanza), el rol `pixelpaws-ci` y el usuario del pipeline. El runbook
+`aws s3 rb --force` no alcanza) y, si se usó el camino de respaldo, el rol `pixelpaws-ci`. El runbook
 tiene los comandos.

@@ -198,7 +198,7 @@ Esta es la sección central del informe. Cada fila es una decisión, qué descar
 | **6 módulos por capacidad** | Un solo archivo, o un módulo por servicio | Cada módulo es una parte completa del sistema y tiene un dueño. La misma estructura se puede llevar a otra nube |
 | **Estado en S3 con `use_lockfile`** | Tabla de DynamoDB para el bloqueo | Desde Terraform 1.10 el bloqueo es nativo: un recurso menos |
 | **Bucket del estado creado con un script** | Que lo cree Terraform | Terraform necesita dónde guardar su estado antes de crear nada. La consigna lo permite como única excepción |
-| **Credenciales temporales de 12 horas** | OIDC | OIDC es lo correcto y está escrito, pero la organización de la cuenta bloquea crear el proveedor ([sección 9](#cómo-entra-github-a-aws)) |
+| **OIDC** | Claves de acceso guardadas en secrets | No hay ninguna clave de AWS en GitHub: cada ejecución pide su propio token y recibe credenciales de una hora ([sección 9](#cómo-entra-github-a-aws)) |
 | **Repositorio público** | Privado | Los revisores obligatorios de los environments de GitHub, que hacen "controlado" al apply, no existen en repos privados de cuentas gratis. Los mails van en un secret |
 
 ### Seguridad y costos
@@ -230,26 +230,39 @@ rol diga "acceso total", lo que la SCP niega queda negado, y no se puede cambiar
 | Crear el presupuesto (Budgets) | ✅ Permitido |
 | Los servicios del proyecto en `us-east-2` | ✅ Permitido |
 | Cualquier otra región | ❌ Bloqueado |
-| Crear el proveedor OIDC de GitHub | ❌ Bloqueado (ver la evidencia pendiente abajo) |
+| Crear el proveedor OIDC de GitHub | ✅ Permitido (lo dimos por bloqueado una semana: ver abajo) |
 | Contraseñas de consola para usuarios IAM | ❌ Bloqueado |
 
-**Qué decidimos.** No bajar la seguridad: el pipeline usa credenciales temporales que vencen solas
-([sección 9](#cómo-entra-github-a-aws)), y el código de OIDC queda escrito y apagado con una
-bandera, listo para una cuenta sin esta restricción.
+**Qué decidimos.** Convivir con las restricciones reales, que son dos: una sola región y nada de
+consola para usuarios IAM. Ninguna afecta al diseño del sistema.
 
-> **Importante: no es una limitación de AWS.** En AWS se puede usar OIDC con GitHub Actions, y es
-> la práctica recomendada. La restricción es de **esta cuenta**, por la organización que la
-> administra.
+### El error de método que nos costó una semana
 
-> 📸 **Evidencia E04: el error al crear el proveedor OIDC en la cuenta del proyecto**
-> Archivo: `evidencias/e04-oidc-error.png` (y el texto del error, copiado) · Estado: ⏳ **pendiente y bloqueante**
-> Es la única prueba de la restricción: AWS no publica el contenido de esa SCP. Se obtiene con
-> `aws iam create-open-id-connect-provider --url https://token.actions.githubusercontent.com --client-id-list sts.amazonaws.com`.
-> Si el error **no** menciona `explicit deny in a service control policy`, OIDC es usable y hay que
-> encenderlo antes de la defensa (el procedimiento está en la guía de defensa, sección 3).
-> **Indicio a favor:** el 18/11, en otra cuenta del plan Free creada en aws.amazon.com, la consulta
-> `aws iam list-open-id-connect-providers` respondió `explicit deny in a service control policy`.
-> <!-- ![Error de OIDC](evidencias/e04-oidc-error.png) -->
+Esta tabla decía, hasta el 25/11, que crear el proveedor OIDC estaba **bloqueado**. Era falso, y
+cómo llegamos a esa conclusión es más instructivo que la conclusión misma.
+
+El 18/11 el primer intento de crear el proveedor falló. No guardamos el mensaje de error.
+Buscamos una explicación y encontramos una que encajaba: la cuenta pertenece a una organización
+administrada por AWS cuya política de control de servicios restringe cosas, y eso sí era
+comprobable, porque efectivamente solo habilita `us-east-2` y niega las contraseñas de consola.
+Dimos por hecho que también negaba OIDC.
+
+Sobre esa premisa rediseñamos el pipeline completo: un usuario IAM emisor, un rol intermedio,
+credenciales de 12 horas y un script para renovarlas a mano.
+
+**El 25/11 lo volvimos a intentar y el proveedor se creó sin ningún error.**
+
+> 📸 **Evidencia E04: el proveedor OIDC creado en la cuenta del proyecto**
+> Archivo: `evidencias/e04-oidc-creado.png`
+> La consola confirma `token.actions.githubusercontent.com added`, tipo OpenID Connect.
+
+Lo que aprendimos no es sobre AWS, es sobre método:
+
+1. **Un error que no se guarda no es evidencia.** Durante una semana el repositorio afirmó una
+   causa que nadie podía comprobar, y eso llegó a la documentación y a las diapositivas.
+2. **Que una explicación encaje no la hace verdadera.** La política existía y restringía otras
+   cosas. Eso hizo verosímil la hipótesis y nos ahorró la molestia de probarla.
+3. **La verificación costaba dos minutos.** El rediseño costó días, y después hubo que deshacerlo.
 
 ---
 
@@ -268,7 +281,7 @@ otro. Por ejemplo, `clasificador` necesita el bucket de `almacenamiento` y la ta
 | `clasificador` | Función, su rol de menor privilegio, la DLQ, el trigger de S3 y el grupo de logs | Gustavo |
 | `observabilidad` | Dashboard, alarma de la DLQ y tópico SNS con los mails | Gustavo |
 | `finops` | Presupuesto de USD 10 con tres avisos | Gustavo |
-| `cicd_oidc` | Proveedor OIDC y rol de GitHub, detrás de la bandera `enable_oidc` | Enzo |
+| `cicd_oidc` | Proveedor OIDC y rol que asume GitHub Actions | Enzo |
 
 **Lo que pide la consigna, punto por punto:**
 
@@ -279,7 +292,7 @@ otro. Por ejemplo, `clasificador` necesita el bucket de `almacenamiento` y la ta
   `default_tags` del provider: se escriben una vez y se aplican a todo.
 - **Variables con descripción, tipo y validación:** por ejemplo, la región solo acepta las tres de
   la franja más barata, el entorno solo `dev` o `prod`, y el presupuesto no puede pasar de USD 10.
-- **Banderas para lo opcional:** una sola, `enable_oidc`, apagada por la restricción de la cuenta.
+- **Banderas para lo opcional:** una sola, `enable_oidc`, encendida. Se apaga solo en cuentas donde no se pueda crear el proveedor.
 - **Idempotencia, probada:** el primer `apply` creó 23 recursos. Al cambiar solo el código de la
   función, el `apply` cambió **1 recurso**. Un segundo `plan` sin cambios no propone nada.
 - **Destroy limpio:** el bucket de fotos tiene `force_destroy`, así se borra aunque tenga fotos.
@@ -316,17 +329,28 @@ mismo estado.
 
 ![Credenciales del pipeline](diagramas/07-credenciales-del-pipeline.png)
 
-- **Lo ideal (izquierda): OIDC.** GitHub presenta un token firmado y AWS le entrega credenciales
-  por una hora, sin ninguna clave guardada. Está escrito en el módulo `cicd_oidc` y se puede ver con
-  `terraform plan -var enable_oidc=true`. En esta cuenta, la organización bloquea crear el
-  proveedor ([sección 7](#7-la-cuenta-de-aws-y-su-techo)).
-- **Lo que usamos (derecha): credenciales temporales.** Un usuario IAM, `pixelpaws-emisor`, cuyo
-  único permiso es asumir el rol `pixelpaws-ci`, genera con `scripts/credenciales-ci.sh` tres
-  valores que **vencen solos en 12 horas**. Se cargan como secrets en GitHub.
+**No hay ninguna clave de AWS guardada en GitHub.** El pipeline entra por OIDC, en cuatro pasos:
 
-**Por qué esto cumple la consigna:** lo que se prohíbe son las *"credenciales de larga duración"*.
-Estas vencen solas: si se filtraran, al día siguiente no sirven. La clave del emisor nunca está en
-el repositorio ni en GitHub, y se borra al cerrar el proyecto.
+1. GitHub Actions le pide a GitHub un token de identidad firmado para esa ejecución concreta. El
+   token dice qué repositorio, qué rama y qué flujo lo pidieron.
+2. El flujo se lo presenta a AWS STS junto con el ARN del rol que quiere asumir.
+3. AWS valida la firma contra el proveedor OIDC registrado en la cuenta y comprueba dos
+   condiciones: que el token sea para `sts.amazonaws.com` y que venga del repositorio autorizado.
+4. STS devuelve credenciales que **viven una hora y mueren solas**.
+
+El rol se llama `pixelpaws-dev-github-actions` y **no tiene `AdministratorAccess`**: lleva siete
+políticas acotadas a los servicios del proyecto, más una en línea para presupuestos, porque
+ninguna política gestionada de AWS cubre `budgets:ModifyBudget`.
+
+El único secret relacionado con AWS es `AWS_ROLE_ARN`. **Un ARN no es un secreto**: sin un token
+OIDC válido emitido para el repositorio autorizado, conocerlo no sirve de nada.
+
+**Por qué esto cumple la consigna:** no hay credenciales que filtrar, porque no existen fuera del
+minuto en que corre el flujo. Y la condición sobre el repositorio implica que otro repositorio de
+GitHub, aunque alguien conociera el ARN, no puede asumir el rol.
+
+El camino anterior, con credenciales de 12 horas generadas por `scripts/credenciales-ci.sh`, se
+conserva como respaldo para cuentas donde no se pueda crear el proveedor, como el Learner Lab.
 
 > 📸 **Evidencia E01: el plan publicado como comentario en un pull request**
 > Archivo: `evidencias/e01-pr-con-plan.png` · Estado: ⏳ pendiente
@@ -363,8 +387,7 @@ logs sin vencimiento.
 
 | Identidad | Permisos | Por qué |
 |---|---|---|
-| Rol `pixelpaws-ci` | `AdministratorAccess` | El pipeline crea roles, políticas y el presupuesto. Solo entrega credenciales de 12 horas como máximo |
-| Usuario `pixelpaws-emisor` | solo asumir `pixelpaws-ci` | Genera las credenciales del pipeline. Su clave vive en una sola PC |
+| Rol `pixelpaws-dev-github-actions` | Siete políticas por servicio más una en línea para Budgets | Lo asume GitHub Actions por OIDC. Sin `AdministratorAccess`. Sesiones de 1 hora |
 | Usuario `gustavo` | `AdministratorAccess` | Acceso por CLI del segundo integrante: la organización bloquea la consola para usuarios IAM |
 
 **Lo que reconocemos.** Las identidades que despliegan tienen `AdministratorAccess`, y eso **no**
@@ -534,7 +557,7 @@ capacidad, no por servicio.
 
 | Limitación | Por qué pasó | Qué haríamos con más tiempo o en otra cuenta |
 |---|---|---|
-| El pipeline no usa OIDC | La organización de la cuenta bloquea el proveedor | Encender `enable_oidc = true` en una cuenta sin esa restricción. El código ya está |
+| Las políticas del rol de CI son `FullAccess` por servicio | Acotarlas recurso por recurso exigía escribirlas a mano y el tiempo era corto | Reemplazarlas por políticas propias con ARN explícitos, como ya se hizo con el rol de la función |
 | Las identidades que despliegan tienen permisos de administrador | Crear roles requiere permisos amplios | Acotarlas con *permission boundaries* |
 | Una sola región | La impone la cuenta, y la consigna pide una | Para producción real, evaluar una réplica en otra región |
 | Un bucket recién creado tarda de 3 a 6 minutos en avisar | Comportamiento de S3 que medimos al desplegar | Ya se resolvió en el proceso: se despliega el día anterior a la demo, como pide la consigna |
@@ -554,7 +577,7 @@ correspondiente, borrar `<!--` y `-->` de la línea de la imagen para que se mue
 | E01 | Plan comentado en un PR | `e01-pr-con-plan.png` | [9](#9-cicd-del-código-a-la-nube) | ⏳ |
 | E02 | Apply esperando aprobación | `e02-apply-esperando-aprobacion.png` | [9](#9-cicd-del-código-a-la-nube) | ⏳ |
 | E03 | Resultado de Checkov | `e03-checkov.png` | [10](#10-seguridad-e-iam) | ⏳ |
-| E04 | Error de OIDC en la cuenta | `e04-oidc-error.png` | [7](#7-la-cuenta-de-aws-y-su-techo) | ⏳ **bloqueante** |
+| E04 | Proveedor OIDC creado | `e04-oidc-creado.png` | [7](#7-la-cuenta-de-aws-y-su-techo) | ✅ |
 | E05 | Salida de `lote.sh` | `../evidencias/lote-20-fotos-2026-11-18.txt` | [13](#13-resultados-el-lote-de-20-fotos) | ✅ |
 | E06 | Filas en DynamoDB | `e06-dynamodb-items.png` | [4](#4-el-recorrido-de-una-foto) | ⏳ |
 | E07 | Dashboard con datos | `e07-dashboard.png` | [11](#11-observabilidad) | ⏳ |

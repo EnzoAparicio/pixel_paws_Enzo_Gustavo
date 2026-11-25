@@ -1,4 +1,4 @@
-# OIDC para GitHub Actions; apagado porque la SCP de la cuenta lo bloquea.
+# OIDC para GitHub Actions: el pipeline entra con un token de corta vida, sin claves guardadas.
 resource "aws_iam_openid_connect_provider" "github" {
   count = var.enable_oidc ? 1 : 0
 
