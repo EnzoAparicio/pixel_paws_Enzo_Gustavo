@@ -25,7 +25,7 @@ reutilizar**. La decisión se toma desde cero.
 
 | Opción                           | Veredicto                                                                                                                                                                                                                        |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Cuenta AWS propia, plan Free** | **Elegida.** USD 100 de crédito al alta (más hasta USD 100 por actividades), 6 meses, sin posibilidad de generar cargos en el plan Free. IAM completo, OIDC y AWS Budgets disponibles. Alta en 15 minutos, sin depender de nadie |
+| **Cuenta AWS propia, plan Free** | **Elegida.** USD 100 de crédito al alta (más hasta USD 100 por actividades), 6 meses, sin posibilidad de generar cargos en el plan Free. IAM completo y AWS Budgets disponibles. OIDC se dio por disponible y resultó bloqueado: ver la corrección de abajo. Alta en 15 minutos, sin depender de nadie |
 | AWS Academy Learner Lab          | Contingencia. Todos los servicios de PixelPaws están habilitados, pero IAM no permite crear roles, no hay OIDC y no existe AWS Budgets. Además la inscripción depende de que el docente invite, y no hay invitación              |
 | Azure for Students               | USD 100 sin tarjeta y OIDC de primera clase, pero obliga a aprender Entra ID, Event Grid y Cosmos DB desde cero con una semana disponible                                                                                        |
 | Skill Builder                    | Simulación. No sirve para Terraform                                                                                                                                                                                              |
@@ -37,6 +37,36 @@ rúbrica descritas abajo.
 Salvedades asumidas: AWS suele pedir un medio de pago para verificar identidad (cargo temporal de
 USD 1 que se devuelve), y el plan Free excluye algunos servicios de alto consumo sin listarlos.
 Rekognition no es uno de ellos, pero la prueba de humo del final sigue siendo obligatoria.
+
+### Corrección del 19/11: OIDC se dio por disponible y no lo estaba
+
+La fila de arriba se escribió antes de tener la cuenta en la mano. Al probarla, el 18/11, crear
+el proveedor OIDC de GitHub falló. La causa: la cuenta del plan Free vive dentro de una
+organización administrada por AWS, con una política de control de servicios (SCP) que prevalece
+sobre los permisos de la cuenta. Esa política habilita solo `us-east-2`, niega las contraseñas de
+consola para usuarios IAM y niega crear proveedores OIDC.
+
+**OIDC funciona en AWS** y es la forma correcta de autenticar GitHub Actions. Lo que no se puede
+es crear el proveedor **en esta cuenta**. No es una limitación del servicio: es el techo que pone
+la organización.
+
+AWS no publica el contenido de esa SCP, así que la única evidencia válida es el mensaje de error
+de la propia cuenta. Se obtiene así, desde una identidad de la cuenta:
+
+```bash
+aws iam list-open-id-connect-providers
+aws iam create-open-id-connect-provider   --url https://token.actions.githubusercontent.com   --client-id-list sts.amazonaws.com
+```
+
+| Resultado | Qué significa |
+|---|---|
+| `AccessDenied` que menciona `explicit deny in a service control policy` | Confirma el bloqueo. El texto del error va a `docs/seguridad.md` |
+| `EntityAlreadyExists` | El proveedor ya existe en la cuenta: OIDC es usable referenciando el existente, no creándolo |
+| `AccessDenied` sin mencionar la SCP | Falta el permiso `iam:CreateOpenIDConnectProvider` en la identidad que lo intentó |
+| Se crea sin error | OIDC es usable: se borra el proveedor y se aplica con `enable_oidc = true` |
+
+Mientras ese error no esté guardado, esta nota describe una medición sin respaldo escrito.
+
 
 ## Verificación de servicios
 

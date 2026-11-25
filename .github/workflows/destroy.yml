@@ -1,13 +1,9 @@
 name: destroy
 
 # Manual: destruye todo y deja evidencia de que la cuenta quedo limpia.
+# La aprobacion del environment production es la unica guarda: no pide confirmacion escrita.
 on:
   workflow_dispatch:
-    inputs:
-      confirmacion:
-        description: 'Escribir DESTRUIR para confirmar'
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -30,12 +26,6 @@ jobs:
     environment: production
 
     steps:
-      - name: Verificar confirmacion
-        if: inputs.confirmacion != 'DESTRUIR'
-        run: |
-          echo "Hay que escribir DESTRUIR para confirmar." >&2
-          exit 1
-
       - uses: actions/checkout@v5
 
       - uses: hashicorp/setup-terraform@v3
@@ -48,7 +38,6 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v5
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}

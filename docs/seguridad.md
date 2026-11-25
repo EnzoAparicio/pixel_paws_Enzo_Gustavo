@@ -22,9 +22,12 @@ Otras identidades:
 
 ## Autenticación del pipeline
 
-La cuenta usa el plan Free de AWS, que la ubica dentro de una organización administrada por AWS
-con una política de control de servicios (SCP). Esa política bloquea crear proveedores OIDC, así
-que GitHub Actions no puede usar identidad federada.
+OIDC es la forma correcta de autenticar GitHub Actions contra AWS, y es lo que este
+repositorio tiene escrito. Lo que no se puede es crear el proveedor OIDC **en esta cuenta**: el
+plan Free de AWS la ubica dentro de una organización administrada por AWS, con una política de
+control de servicios (SCP) que prevalece sobre los permisos de la cuenta y niega ese recurso. No
+es una limitación del servicio, es el techo que pone la organización. Verificación y resultados
+posibles: `docs/Decision 01 - cuenta AWS Academy y brechas de la consigna.md`.
 
 En su lugar, el pipeline recibe **credenciales temporales** del rol `pixelpaws-ci`, generadas con
 `scripts/credenciales-ci.sh`. Vencen solas: 12 horas desde un usuario IAM (se usa

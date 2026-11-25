@@ -1,0 +1,26 @@
+Lote de 20 fotos - PixelPaws - corrido el 18/11/2026 (version final, tabla con los 4 campos de la consigna)
+Bucket pixelpaws-dev-fotos-ca1889 / tabla pixelpaws-dev-clasificaciones / us-east-2
+
+ARCHIVO           ETIQUETA  CONFIANZA  FECHA
+lote/gato01.jpg   Cat       99.49      2026-11-18T19:40:09+00:00
+lote/gato02.jpg   Cat       99.99      2026-11-18T19:40:11+00:00
+lote/gato03.jpg   Cat       99.91      2026-11-18T19:40:13+00:00
+lote/gato04.jpg   Cat       99.66      2026-11-18T19:40:15+00:00
+lote/gato05.jpg   Cat       99.86      2026-11-18T19:40:18+00:00
+lote/gato06.jpg   Cat       94.18      2026-11-18T19:40:20+00:00
+lote/gato07.jpg   Cat       100        2026-11-18T19:40:22+00:00
+lote/gato08.jpg   Cat       99.77      2026-11-18T19:40:24+00:00
+lote/gato09.jpg   Cat       98.34      2026-11-18T19:40:26+00:00
+lote/gato10.jpg   Cat       99.7       2026-11-18T19:40:28+00:00
+lote/perro01.jpg  Dog       99.39      2026-11-18T19:40:30+00:00
+lote/perro02.jpg  Dog       99.99      2026-11-18T19:40:31+00:00
+lote/perro03.jpg  Dog       99.98      2026-11-18T19:40:34+00:00
+lote/perro04.jpg  Dog       99.88      2026-11-18T19:40:35+00:00
+lote/perro05.jpg  Dog       100        2026-11-18T19:40:37+00:00
+lote/perro06.jpg  Dog       99.5       2026-11-18T19:40:40+00:00
+lote/perro07.jpg  Dog       99.95      2026-11-18T19:40:41+00:00
+lote/perro08.jpg  Dog       99.47      2026-11-18T19:40:43+00:00
+lote/perro09.jpg  Dog       99.66      2026-11-18T19:40:46+00:00
+lote/perro10.jpg  Dog       99.73      2026-11-18T19:40:48+00:00
+
+>> Resumen: 10 perros, 10 gatos, 0 sin clasificar, 0 pendientes.
