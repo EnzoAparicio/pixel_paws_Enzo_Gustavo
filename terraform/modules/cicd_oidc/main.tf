@@ -27,11 +27,16 @@ data "aws_iam_policy_document" "confianza" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # Solo este repositorio puede asumir el rol.
+    # Solo este repositorio puede asumir el rol. GitHub puede mandar el sub en
+    # formato clasico (repo:owner/nombre:...) o con IDs inmutables
+    # (repo:owner@id/nombre@id:...); se aceptan los dos.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.repositorio}:*"]
+      values = [
+        "repo:${var.repositorio}:*",
+        "repo:${replace(var.repositorio, "/", "@*/")}@*:*",
+      ]
     }
   }
 }
